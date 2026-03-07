@@ -315,15 +315,1245 @@ function ManageConnections({connections,activeId,onSwitch,onDelete,onEdit,onClos
   </div>
 }
 
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  SIMPLE SCREENS
+// ═══════════════════════════════════════════════════════════════════════════════
+function LoadingScreen() {
+  return (
+    <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",height:"60vh",gap:16,color:T.muted}}>
+      <Ic n="sync" s={36} spin/>
+      <div style={{fontSize:14,fontWeight:500}}>Conectando con Ágora…</div>
+    </div>
+  )
+}
+function ErrorScreen({error,onRetry,onSetup}) {
+  const isCors=(error||"").toLowerCase().includes("cors")||(error||"").includes("fetch")||(error||"").includes("network")
+  return (
+    <div style={{maxWidth:480,margin:"60px auto",padding:24}}>
+      <div style={{...S.card,textAlign:"center",padding:32}}>
+        <div style={{fontSize:40,marginBottom:12}}>⚠️</div>
+        <h2 style={{fontSize:17,fontWeight:700,color:T.text,marginBottom:8}}>Error de conexión</h2>
+        <p style={{fontSize:13,color:T.muted,marginBottom:20,lineHeight:1.6}}>{error||"No se pudo conectar con Ágora TPV"}</p>
+        {isCors&&<div style={{background:"rgba(5,146,167,0.06)",border:"1px solid rgba(5,146,167,0.25)",borderRadius:10,padding:14,marginBottom:16,textAlign:"left"}}>
+          <div style={{fontSize:12,fontWeight:700,color:T.accent,marginBottom:6}}>💡 Error CORS — soluciones:</div>
+          <ul style={{fontSize:12,color:T.muted,lineHeight:1.8,paddingLeft:18}}>
+            <li>Abre StockIn dentro del iframe del TPV de Ágora</li>
+            <li>Activa «Proxy vía Claude» en la configuración de conexión</li>
+            <li>Configura un proxy CORS en tu servidor</li>
+          </ul>
+        </div>}
+        <div style={{display:"flex",gap:10,justifyContent:"center"}}>
+          <Btn onClick={onRetry} variant="primary"><Ic n="sync" s={13}/>Reintentar</Btn>
+          <Btn onClick={onSetup} variant="secondary"><Ic n="settings" s={13}/>Configuración</Btn>
+        </div>
+      </div>
+    </div>
+  )
+}
+function NoConnection({onSetup,onNew}) {
+  return (
+    <div style={{maxWidth:480,margin:"60px auto",padding:24}}>
+      <div style={{...S.card,textAlign:"center",padding:32}}>
+        <div style={{fontSize:40,marginBottom:12}}>🔌</div>
+        <h2 style={{fontSize:17,fontWeight:700,color:T.text,marginBottom:8}}>Sin conexión configurada</h2>
+        <p style={{fontSize:13,color:T.muted,marginBottom:20,lineHeight:1.6}}>Configura una conexión con Ágora TPV para empezar.</p>
+        <div style={{display:"flex",gap:10,justifyContent:"center"}}>
+          <Btn onClick={onNew} variant="primary"><Ic n="plus" s={13}/>Nueva conexión</Btn>
+          <Btn onClick={onSetup} variant="secondary"><Ic n="settings" s={13}/>Configuración</Btn>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  SETUP VIEW
+// ═══════════════════════════════════════════════════════════════════════════════
+function SetupView({connections,activeId,onNew,onEdit,onSwitch,onDelete,toast,autoSyncInterval,onAutoSyncChange,whatsappCfg,onWhatsappSave}) {
+  const [tab,setTab]=useState("conexiones")
+  const [wa,setWa]=useState(whatsappCfg||{enabled:false,phone:"",apikey:""})
+  const tabStyle=(t)=>({padding:"8px 16px",border:"none",cursor:"pointer",background:tab===t?T.accent:"transparent",color:tab===t?"#fff":T.muted,borderRadius:6,fontSize:13,fontWeight:600,fontFamily:"inherit"})
+  return (
+    <div style={{maxWidth:760,margin:"0 auto"}}>
+      <div style={{marginBottom:20}}>
+        <h1 style={{fontSize:20,fontWeight:800,color:T.brand,margin:0}}>Configuración</h1>
+      </div>
+      <div style={{display:"flex",gap:4,marginBottom:18,background:T.bg,padding:4,borderRadius:9,width:"fit-content"}}>
+        {["conexiones","auto-sync","whatsapp"].map(t=><button key={t} style={tabStyle(t)} onClick={()=>setTab(t)}>{t==="conexiones"?"Conexiones":t==="auto-sync"?"Auto-sync":"WhatsApp"}</button>)}
+      </div>
+      {tab==="conexiones"&&<div style={S.card}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+          <h2 style={{fontSize:15,fontWeight:700,color:T.brand,margin:0}}>Conexiones con Ágora</h2>
+          <Btn small variant="primary" onClick={onNew}><Ic n="plus" s={13}/>Nueva conexión</Btn>
+        </div>
+        {connections.length===0?<Empty msg="No hay conexiones. Añade una para empezar." icon="link"/>:
+        connections.map(c=><div key={c.id} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 0",borderBottom:`1px solid ${T.border}`}}>
+          <div style={{width:38,height:38,borderRadius:10,background:c.id===activeId?T.accent:T.brand,display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,fontWeight:700,color:"#fff",flexShrink:0}}>{(c.name||"?")[0].toUpperCase()}</div>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontSize:13,fontWeight:600,color:T.text}}>{c.name||"Sin nombre"}</div>
+            <div style={{fontSize:11,color:T.muted}}>{c.agoraUrl||"iframe/TPV"} · {c.mode==="acms"?"ACMS":"Mono"}{c.id===activeId?" · Activa":""}</div>
+          </div>
+          <div style={{display:"flex",gap:6}}>
+            {c.id!==activeId&&<Btn small variant="success" onClick={()=>onSwitch(c.id)}>Activar</Btn>}
+            <Btn small variant="secondary" onClick={()=>onEdit(c)}><Ic n="settings" s={12}/></Btn>
+            <Btn small variant="danger" onClick={()=>onDelete(c.id)}><Ic n="trash" s={12}/></Btn>
+          </div>
+        </div>)}
+      </div>}
+      {tab==="auto-sync"&&<div style={S.card}>
+        <h2 style={{fontSize:15,fontWeight:700,color:T.brand,marginBottom:16}}>Sincronización automática</h2>
+        <Field label="Intervalo de sincronización">
+          <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+            {[0,5,10,15,30].map(v=>(
+              <button key={v} onClick={()=>onAutoSyncChange(v)} style={{padding:"8px 16px",borderRadius:8,border:`2px solid ${autoSyncInterval===v?T.accent:T.border}`,background:autoSyncInterval===v?"rgba(5,146,167,0.07)":"#fff",cursor:"pointer",fontFamily:"inherit",fontSize:13,fontWeight:600,color:autoSyncInterval===v?T.accent:T.text}}>
+                {v===0?"Desactivado":`${v} min`}
+              </button>
+            ))}
+          </div>
+        </Field>
+        <p style={{fontSize:12,color:T.muted,marginTop:12,lineHeight:1.6}}>Cuando está activo, StockIn se sincroniza automáticamente con Ágora cada X minutos. El contador regresivo aparece en la barra lateral.</p>
+      </div>}
+      {tab==="whatsapp"&&<div style={S.card}>
+        <h2 style={{fontSize:15,fontWeight:700,color:T.brand,marginBottom:4}}>Alertas por WhatsApp</h2>
+        <p style={{fontSize:12,color:T.muted,marginBottom:16,lineHeight:1.6}}>Usa <b>CallMeBot</b> (gratis). Envía «I allow callmebot to send me messages» al +34 644 64 26 64 en WhatsApp para obtener tu apikey.</p>
+        <div style={{display:"flex",flexDirection:"column",gap:12}}>
+          <div style={{display:"flex",alignItems:"center",gap:10}}>
+            <input type="checkbox" id="wa_enabled" checked={wa.enabled} onChange={e=>setWa(p=>({...p,enabled:e.target.checked}))} style={{width:16,height:16,accentColor:T.accent}}/>
+            <label htmlFor="wa_enabled" style={{fontSize:13,fontWeight:600,color:T.text,cursor:"pointer"}}>Activar alertas WhatsApp</label>
+          </div>
+          <Field label="Número de teléfono (con prefijo, sin +)">
+            <input value={wa.phone} onChange={e=>setWa(p=>({...p,phone:e.target.value}))} placeholder="34612345678" style={S.inp} disabled={!wa.enabled}/>
+          </Field>
+          <Field label="API Key de CallMeBot">
+            <input value={wa.apikey} onChange={e=>setWa(p=>({...p,apikey:e.target.value}))} placeholder="123456" style={S.inp} disabled={!wa.enabled}/>
+          </Field>
+          <div style={{display:"flex",gap:8}}>
+            <Btn variant="primary" onClick={()=>{onWhatsappSave(wa);toast("Configuración de WhatsApp guardada")}}>Guardar</Btn>
+            <Btn variant="secondary" onClick={async()=>{
+              if(!wa.phone||!wa.apikey){toast("Introduce teléfono y apikey","err");return}
+              try{await fetch(`https://api.callmebot.com/whatsapp.php?phone=${wa.phone}&text=${encodeURIComponent("✅ StockIn — Prueba de alertas OK")}&apikey=${wa.apikey}`);toast("Mensaje de prueba enviado")}catch(e){toast("Error: "+e.message,"err")}
+            }}>Probar</Btn>
+          </div>
+        </div>
+      </div>}
+    </div>
+  )
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  DASHBOARD
+// ═══════════════════════════════════════════════════════════════════════════════
+function Dashboard({stockRows,alertas,albaranes,traspasos,conn,onNav,role}) {
+  const agotados=stockRows.filter(r=>r.Quantity<=0)
+  const bajoMin=stockRows.filter(r=>r.minStock>0&&r.Quantity>0&&r.Quantity<r.minStock)
+  const sobreMax=stockRows.filter(r=>r.maxStock>0&&r.Quantity>r.maxStock)
+  const valorTotal=stockRows.reduce((s,r)=>{const p=r.salePrice??0;return s+r.Quantity*p},0)
+  const kpis=[
+    {label:"Productos",val:new Set(stockRows.map(r=>r.ProductId)).size,icon:"box",color:T.accent},
+    {label:"Valor stock",val:"€"+valorTotal.toFixed(0),icon:"euro",color:T.brand},
+    {label:"Agotados",val:agotados.length,icon:"alert",color:T.red,link:"alertas"},
+    {label:"Bajo mínimo",val:bajoMin.length,icon:"alert",color:T.orange,link:"alertas"},
+  ]
+  const recentAlb=albaranes.slice(0,6)
+  const fmtDate=(d)=>{if(!d)return"—";try{return new Date(d).toLocaleDateString("es-ES",{day:"2-digit",month:"2-digit"})}catch{return d}}
+  return (
+    <div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+        <h1 style={{fontSize:20,fontWeight:800,color:T.brand,margin:0}}>Dashboard</h1>
+        {conn&&<div style={{fontSize:12,color:T.muted}}>{conn.name||conn.agoraUrl||"Conectado"}</div>}
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:14,marginBottom:24}}>
+        {kpis.map(k=>(
+          <div key={k.label} onClick={k.link?()=>onNav(k.link):undefined} style={{...S.card,cursor:k.link?"pointer":"default",display:"flex",alignItems:"center",gap:14,padding:18,transition:"box-shadow 0.15s"}}
+            onMouseEnter={e=>{if(k.link)e.currentTarget.style.boxShadow="0 4px 16px rgba(3,70,80,0.12)"}}
+            onMouseLeave={e=>e.currentTarget.style.boxShadow="0 1px 3px rgba(3,70,80,0.07)"}>
+            <div style={{width:44,height:44,borderRadius:12,background:`${k.color}18`,display:"flex",alignItems:"center",justifyContent:"center",color:k.color,flexShrink:0}}>
+              <Ic n={k.icon} s={22}/>
+            </div>
+            <div>
+              <div style={{fontSize:22,fontWeight:800,color:k.color,lineHeight:1}}>{k.val}</div>
+              <div style={{fontSize:12,color:T.muted,marginTop:3}}>{k.label}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
+        <div style={S.card}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+            <h3 style={{fontSize:14,fontWeight:700,color:T.brand,margin:0}}>Alertas activas</h3>
+            <Btn small variant="secondary" onClick={()=>onNav("alertas")}><Ic n="alert" s={12}/>Ver todas</Btn>
+          </div>
+          {alertas.length===0?<Empty msg="Sin alertas activas" icon="check"/>:
+          alertas.slice(0,5).map((r,i)=>(
+            <div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderBottom:`1px solid ${T.border}`}}>
+              <div style={{width:6,height:6,borderRadius:"50%",background:r.Quantity<=0?T.red:T.orange,flexShrink:0}}/>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:12,fontWeight:600,color:T.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.prod?.Name||r.ProductId}</div>
+                <div style={{fontSize:11,color:T.muted}}>{r.whName} · stock: {r.Quantity} / mín: {r.minStock}</div>
+              </div>
+            </div>
+          ))}
+          {alertas.length>5&&<div style={{fontSize:11,color:T.muted,textAlign:"center",paddingTop:8}}>y {alertas.length-5} más…</div>}
+        </div>
+        <div style={S.card}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+            <h3 style={{fontSize:14,fontWeight:700,color:T.brand,margin:0}}>Últimas entradas</h3>
+            <Btn small variant="secondary" onClick={()=>onNav("albaranes")}><Ic n="albaran" s={12}/>Ver todas</Btn>
+          </div>
+          {recentAlb.length===0?<Empty msg="Sin albaranes recientes" icon="albaran"/>:
+          recentAlb.map((a,i)=>(
+            <div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderBottom:`1px solid ${T.border}`}}>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:12,fontWeight:600,color:T.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{a.Supplier?.Name||a.SupplierId||"Proveedor"}</div>
+                <div style={{fontSize:11,color:T.muted}}>{fmtDate(a.Date)} · {(a.Lines||[]).length} líneas</div>
+              </div>
+              <StatusBadge status={a.Status}/>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  ALERTAS VIEW
+// ═══════════════════════════════════════════════════════════════════════════════
+function AlertasView({stockRows,alertas,warehouses,onIrInventario,role}) {
+  const [tab,setTab]=useState("agotados")
+  const agotados=stockRows.filter(r=>r.Quantity<=0&&r.minStock>0)
+  const bajoMin=stockRows.filter(r=>r.minStock>0&&r.Quantity>0&&r.Quantity<r.minStock)
+  const sobreMax=stockRows.filter(r=>r.maxStock>0&&r.Quantity>r.maxStock)
+  const rows={agotados,bajoMin,sobreMax}
+  const labels={agotados:`Agotados (${agotados.length})`,bajoMin:`Bajo mínimo (${bajoMin.length})`,sobreMax:`Sobre máximo (${sobreMax.length})`}
+  const tabStyle=(t)=>({padding:"7px 14px",border:"none",cursor:"pointer",background:tab===t?T.accent:"transparent",color:tab===t?"#fff":T.muted,borderRadius:6,fontSize:12,fontWeight:600,fontFamily:"inherit"})
+  const current=rows[tab]||[]
+  return (
+    <div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18}}>
+        <h1 style={{fontSize:20,fontWeight:800,color:T.brand,margin:0}}>Alertas de stock</h1>
+        <Btn small variant="primary" onClick={onIrInventario}><Ic n="adjust" s={13}/>Ir a regularización</Btn>
+      </div>
+      <div style={{display:"flex",gap:4,marginBottom:16,background:T.bg,padding:4,borderRadius:9,width:"fit-content"}}>
+        {Object.entries(labels).map(([k,v])=><button key={k} style={{...tabStyle(k),color:tab===k?"#fff":k==="agotados"?T.red:k==="bajoMin"?T.orange:T.yellow}} onClick={()=>setTab(k)}>{v}</button>)}
+      </div>
+      <div style={S.card}>
+        {current.length===0?<Empty msg="Sin alertas en esta categoría" icon="check"/>:
+        <table style={{width:"100%",borderCollapse:"collapse"}}>
+          <thead><tr>
+            {["Producto","Familia","Almacén","Stock actual","Mín","Máx","Diferencia"].map(h=><th key={h} style={thSt}>{h}</th>)}
+          </tr></thead>
+          <tbody>
+          {current.map((r,i)=>{
+            const diff=tab==="agotados"?r.minStock:tab==="bajoMin"?r.minStock-r.Quantity:r.Quantity-r.maxStock
+            const clr=tab==="agotados"?T.red:tab==="bajoMin"?T.orange:T.yellow
+            return <tr key={i} style={{background:i%2?"#f8fbfb":"#fff"}}>
+              <td style={{padding:"9px 14px",fontSize:13,fontWeight:600,color:T.text}}>{r.prod?.Name||r.ProductId}</td>
+              <td style={{padding:"9px 14px",fontSize:12,color:T.muted}}>{r.prod?.FamilyName||"—"}</td>
+              <td style={{padding:"9px 14px",fontSize:12,color:T.muted}}>{r.whName}</td>
+              <td style={{padding:"9px 14px"}}><span style={{fontWeight:700,color:clr}}>{r.Quantity}</span></td>
+              <td style={{padding:"9px 14px",fontSize:12,color:T.muted}}>{r.minStock||"—"}</td>
+              <td style={{padding:"9px 14px",fontSize:12,color:T.muted}}>{r.maxStock||"—"}</td>
+              <td style={{padding:"9px 14px"}}><span style={{color:clr,fontWeight:700,fontSize:12}}>+{diff}</span></td>
+            </tr>
+          })}
+          </tbody>
+        </table>}
+      </div>
+    </div>
+  )
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  STOCK VIEW  (con rotación de stock)
+// ═══════════════════════════════════════════════════════════════════════════════
+function StockView({stockRows,warehouses,role,albaranes}) {
+  const [search,setSearch]=useState("")
+  const [whFilter,setWhFilter]=useState("")
+  const [famFilter,setFamFilter]=useState("")
+  const [sort,setSort]=useState({col:"prod",dir:1})
+  const seePrices=PERMS.seeCostPrices(role)
+
+  // Calcular consumo diario por producto a partir de albaranes (últimos 30 días)
+  const consumoDiario=useMemo(()=>{
+    const cutoff=new Date();cutoff.setDate(cutoff.getDate()-30)
+    const map={}
+    ;(albaranes||[]).forEach(alb=>{
+      if(!alb.Date||new Date(alb.Date)<cutoff) return
+      ;(alb.Lines||[]).forEach(l=>{
+        const pid=l.ProductId
+        if(!map[pid]) map[pid]=0
+        map[pid]+=(l.DeliveredQuantity||l.OrderedQuantity||0)
+      })
+    })
+    Object.keys(map).forEach(k=>{ map[k]=map[k]/30 })
+    return map
+  },[albaranes])
+
+  const families=[...new Set(stockRows.map(r=>r.prod?.FamilyName||"—").filter(Boolean))].sort()
+
+  const sortedRows=useMemo(()=>{
+    let rows=[...stockRows]
+    if(search) rows=rows.filter(r=>(r.prod?.Name||"").toLowerCase().includes(search.toLowerCase())||(r.prod?.Reference||"").toLowerCase().includes(search.toLowerCase()))
+    if(whFilter) rows=rows.filter(r=>String(r.WarehouseId)===whFilter)
+    if(famFilter) rows=rows.filter(r=>(r.prod?.FamilyName||"—")===famFilter)
+    rows.sort((a,b)=>{
+      let va,vb
+      if(sort.col==="prod"){va=a.prod?.Name||"";vb=b.prod?.Name||""}
+      else if(sort.col==="qty"){va=a.Quantity;vb=b.Quantity}
+      else if(sort.col==="dias"){
+        const ca=consumoDiario[a.ProductId]||0;const cb=consumoDiario[b.ProductId]||0
+        va=ca>0?a.Quantity/ca:99999;vb=cb>0?b.Quantity/cb:99999
+      }
+      else{va=a[sort.col]||0;vb=b[sort.col]||0}
+      return va<vb?-sort.dir:va>vb?sort.dir:0
+    })
+    return rows
+  },[stockRows,search,whFilter,famFilter,sort,consumoDiario])
+
+  const Th=({col,children})=>(
+    <th style={{...thSt,cursor:"pointer",userSelect:"none"}} onClick={()=>setSort(s=>({col,dir:s.col===col?-s.dir:1}))}>
+      {children}{sort.col===col?(sort.dir===1?" ↑":" ↓"):""}
+    </th>
+  )
+  const diasRestantes=(row)=>{
+    const c=consumoDiario[row.ProductId]||0
+    if(c<=0) return null
+    return Math.round(row.Quantity/c)
+  }
+  const diasColor=(d)=>d<7?T.red:d<14?T.orange:T.green
+
+  return (
+    <div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18,flexWrap:"wrap",gap:12}}>
+        <h1 style={{fontSize:20,fontWeight:800,color:T.brand,margin:0}}>Stock actual</h1>
+        <div style={{fontSize:13,color:T.muted}}>{sortedRows.length} líneas</div>
+      </div>
+      <div style={{display:"flex",gap:10,marginBottom:14,flexWrap:"wrap"}}>
+        <div style={{position:"relative",flex:"1 1 220px"}}>
+          <Ic n="search" s={14} style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",color:T.muted,pointerEvents:"none"}}/>
+          <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Buscar producto o referencia…" style={{...S.inp,paddingLeft:34}}/>
+        </div>
+        <select value={whFilter} onChange={e=>setWhFilter(e.target.value)} style={{...S.inp,width:"auto",flex:"0 0 auto"}}>
+          <option value="">Todos los almacenes</option>
+          {warehouses.map(w=><option key={w.Id} value={String(w.Id)}>{w.Name}</option>)}
+        </select>
+        <select value={famFilter} onChange={e=>setFamFilter(e.target.value)} style={{...S.inp,width:"auto",flex:"0 0 auto"}}>
+          <option value="">Todas las familias</option>
+          {families.map(f=><option key={f} value={f}>{f}</option>)}
+        </select>
+      </div>
+      <div style={{...S.card,padding:0,overflow:"auto"}}>
+        <table style={{width:"100%",borderCollapse:"collapse",minWidth:700}}>
+          <thead><tr>
+            <Th col="prod">Producto</Th>
+            <th style={thSt}>Ref</th>
+            <th style={thSt}>Familia</th>
+            <th style={thSt}>Almacén</th>
+            <th style={thSt}>Ubicación</th>
+            <Th col="qty">Stock</Th>
+            <th style={thSt}>Mín</th>
+            <th style={thSt}>Máx</th>
+            <Th col="dias">Días restantes</Th>
+            {seePrices&&<th style={thSt}>P. Coste</th>}
+            <th style={thSt}>P. Venta</th>
+          </tr></thead>
+          <tbody>
+          {sortedRows.length===0&&<tr><td colSpan={10} style={{padding:32,textAlign:"center",color:T.muted}}>Sin resultados</td></tr>}
+          {sortedRows.map((r,i)=>{
+            const dias=diasRestantes(r)
+            const stockClr=r.Quantity<=0?T.red:r.minStock>0&&r.Quantity<r.minStock?T.orange:r.maxStock>0&&r.Quantity>r.maxStock?T.yellow:T.green
+            return <tr key={i} style={{background:i%2?"#f8fbfb":"#fff",borderBottom:`1px solid ${T.border}`}}>
+              <td style={{padding:"9px 14px",fontSize:13,fontWeight:600,color:T.text,maxWidth:220,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.prod?.Name||r.ProductId}</td>
+              <td style={{padding:"9px 14px",fontSize:11,color:T.muted,fontFamily:"monospace"}}>{r.prod?.Reference||"—"}</td>
+              <td style={{padding:"9px 14px",fontSize:12,color:T.muted}}>{r.prod?.FamilyName||"—"}</td>
+              <td style={{padding:"9px 14px",fontSize:12,color:T.muted}}>{r.whName}</td>
+              <td style={{padding:"9px 14px",fontSize:12,color:T.muted}}>{r.loc||"—"}</td>
+              <td style={{padding:"9px 14px"}}><span style={{fontWeight:700,color:stockClr}}>{r.Quantity}</span></td>
+              <td style={{padding:"9px 14px",fontSize:12,color:T.muted}}>{r.minStock||"—"}</td>
+              <td style={{padding:"9px 14px",fontSize:12,color:T.muted}}>{r.maxStock||"—"}</td>
+              <td style={{padding:"9px 14px"}}>{dias!==null
+                ?<span style={{fontWeight:700,color:diasColor(dias),fontSize:12}}>{dias}d</span>
+                :<span style={{color:T.muted,fontSize:12}}>—</span>
+              }</td>
+              {seePrices&&<td style={{padding:"9px 14px",fontSize:12,color:T.muted}}>{r.costPrice!=null?`€${fmt(r.costPrice)}`:"—"}</td>}
+              <td style={{padding:"9px 14px",fontSize:12,color:T.muted}}>{r.salePrice!=null?`€${fmt(r.salePrice)}`:"—"}</td>
+            </tr>
+          })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  BARCODE SCANNER
+// ═══════════════════════════════════════════════════════════════════════════════
+function BarcodeScanner({onScan,onClose}) {
+  const videoRef=useRef(null)
+  const readerRef=useRef(null)
+  const [err,setErr]=useState(null)
+  const [ready,setReady]=useState(false)
+
+  useEffect(()=>{
+    let cancelled=false
+    import('@zxing/browser').then(({BrowserMultiFormatReader})=>{
+      if(cancelled) return
+      readerRef.current=new BrowserMultiFormatReader()
+      setReady(true)
+      readerRef.current.decodeFromVideoDevice(undefined,videoRef.current,(result,error)=>{
+        if(cancelled) return
+        if(result){
+          onScan(result.getText())
+          onClose()
+        }
+      }).catch(e=>setErr(e.message))
+    }).catch(()=>setErr("Instala @zxing/browser: npm install @zxing/browser"))
+    return()=>{
+      cancelled=true
+      try{readerRef.current?.reset()}catch{}
+    }
+  },[])
+
+  return (
+    <Modal title="Escanear código de barras" onClose={onClose} maxW={480}>
+      {err
+        ?<div style={{padding:16,background:"#fff5f5",border:`1px solid ${T.red}`,borderRadius:8,color:T.red,fontSize:13}}>{err}</div>
+        :<div>
+          <video ref={videoRef} style={{width:"100%",borderRadius:8,background:"#000",minHeight:240}} muted autoPlay playsInline/>
+          {!ready&&<div style={{textAlign:"center",padding:16,color:T.muted,fontSize:13}}>Iniciando cámara…</div>}
+          <p style={{fontSize:12,color:T.muted,marginTop:10,textAlign:"center"}}>Enfoca el código de barras del producto</p>
+        </div>
+      }
+    </Modal>
+  )
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  REGULARIZACIÓN VIEW  (3 pasos)
+// ═══════════════════════════════════════════════════════════════════════════════
+function RegularizacionView({stockRows,products,warehouses,conn,onGuardar,toast,role}) {
+  const [step,setStep]=useState(1)
+  const [whId,setWhId]=useState("")
+  const [search,setSearch]=useState("")
+  const [selected,setSelected]=useState([]) // [{ProductId,productName,currentQty,cantidad,costPrice,loc}]
+  const [motivo,setMotivo]=useState("")
+  const [tipo,setTipo]=useState("entrada")
+  const [sending,setSending]=useState(false)
+  const [showScanner,setShowScanner]=useState(false)
+  const seePrices=PERMS.seeCostPrices(role)
+
+  const whRows=stockRows.filter(r=>!whId||String(r.WarehouseId)===whId)
+  const filteredRows=whRows.filter(r=>(r.prod?.Name||"").toLowerCase().includes(search.toLowerCase())||(r.prod?.Reference||"").toLowerCase().includes(search.toLowerCase()))
+
+  const isSelected=(pid)=>selected.some(s=>s.ProductId===pid)
+  const toggleProduct=(row)=>{
+    setSelected(prev=>{
+      if(isSelected(row.ProductId)) return prev.filter(s=>s.ProductId!==row.ProductId)
+      return [...prev,{ProductId:row.ProductId,productName:row.prod?.Name||String(row.ProductId),currentQty:row.Quantity,cantidad:"0",costPrice:row.costPrice!=null?String(row.costPrice):"0",loc:row.loc||""}]
+    })
+  }
+  const updateLine=(pid,field,val)=>setSelected(prev=>prev.map(s=>s.ProductId===pid?{...s,[field]:val}:s))
+
+  const handleScan=(barcode)=>{
+    const row=stockRows.find(r=>r.prod?.Barcode===barcode||r.prod?.Reference===barcode)
+    if(!row){toast("Código no encontrado: "+barcode,"err");return}
+    if(!isSelected(row.ProductId)) toggleProduct(row)
+    toast("Producto encontrado: "+row.prod?.Name)
+  }
+
+  const confirmar=async()=>{
+    const lineas=selected.filter(s=>parseFloat(s.cantidad)!==0&&parseFloat(s.cantidad)!==s.currentQty)
+    if(!lineas.length){toast("No hay cambios que registrar","err");return}
+    setSending(true)
+    try{
+      await onGuardar({lineas,motivo,warehouseId:parseInt(whId)||null,tipo})
+      toast("Regularización enviada a Ágora ✓")
+      setStep(1);setSelected([]);setMotivo("");setSearch("")
+    }catch(e){toast("Error: "+e.message,"err")}
+    finally{setSending(false)}
+  }
+
+  const StepIndicator=()=>(
+    <div style={{display:"flex",alignItems:"center",gap:0,marginBottom:24}}>
+      {[1,2,3].map((s,i)=>(
+        <div key={s} style={{display:"flex",alignItems:"center"}}>
+          <div style={{width:28,height:28,borderRadius:"50%",background:step>=s?T.accent:T.border,color:step>=s?"#fff":"#999",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:700,flexShrink:0}}>{s}</div>
+          {i<2&&<div style={{width:40,height:2,background:step>s?T.accent:T.border}}/>}
+        </div>
+      ))}
+      <div style={{marginLeft:12,fontSize:13,color:T.muted}}>{step===1?"Seleccionar productos":step===2?"Introducir cantidades":"Confirmar"}</div>
+    </div>
+  )
+
+  return (
+    <div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+        <h1 style={{fontSize:20,fontWeight:800,color:T.brand,margin:0}}>Regularización de inventario</h1>
+      </div>
+      <StepIndicator/>
+
+      {step===1&&<div style={S.card}>
+        <div style={{display:"flex",gap:10,marginBottom:14,flexWrap:"wrap"}}>
+          <select value={whId} onChange={e=>{setWhId(e.target.value);setSelected([])}} style={{...S.inp,width:"auto",flex:"0 0 auto"}}>
+            <option value="">Todos los almacenes</option>
+            {warehouses.map(w=><option key={w.Id} value={String(w.Id)}>{w.Name}</option>)}
+          </select>
+          <div style={{position:"relative",flex:"1 1 200px"}}>
+            <Ic n="search" s={14} style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",color:T.muted,pointerEvents:"none"}}/>
+            <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Buscar producto…" style={{...S.inp,paddingLeft:34}}/>
+          </div>
+          <Btn small variant="secondary" onClick={()=>setShowScanner(true)}><Ic n="camera" s={13}/>Escanear</Btn>
+        </div>
+        {selected.length>0&&<div style={{marginBottom:10,fontSize:12,color:T.accent,fontWeight:600}}>{selected.length} producto{selected.length>1?"s":""} seleccionado{selected.length>1?"s":""}</div>}
+        <div style={{maxHeight:420,overflowY:"auto"}}>
+          <table style={{width:"100%",borderCollapse:"collapse"}}>
+            <thead><tr>
+              <th style={thSt}><input type="checkbox" onChange={e=>{if(e.target.checked)setSelected(filteredRows.map(r=>({ProductId:r.ProductId,productName:r.prod?.Name||String(r.ProductId),currentQty:r.Quantity,cantidad:"0",costPrice:String(r.costPrice??0),loc:r.loc||""})));else setSelected([])}} checked={filteredRows.length>0&&filteredRows.every(r=>isSelected(r.ProductId))} style={{accentColor:T.accent}}/></th>
+              <th style={thSt}>Producto</th>
+              <th style={thSt}>Almacén</th>
+              <th style={thSt}>Stock actual</th>
+              <th style={thSt}>Ubicación</th>
+            </tr></thead>
+            <tbody>
+            {filteredRows.length===0&&<tr><td colSpan={5} style={{padding:24,textAlign:"center",color:T.muted}}>Sin productos</td></tr>}
+            {filteredRows.map((r,i)=>(
+              <tr key={i} style={{background:isSelected(r.ProductId)?"rgba(5,146,167,0.05)":i%2?"#f8fbfb":"#fff",cursor:"pointer"}} onClick={()=>toggleProduct(r)}>
+                <td style={{padding:"9px 14px"}}><input type="checkbox" checked={isSelected(r.ProductId)} onChange={()=>{}} style={{accentColor:T.accent}}/></td>
+                <td style={{padding:"9px 14px",fontSize:13,fontWeight:600,color:T.text}}>{r.prod?.Name||r.ProductId}</td>
+                <td style={{padding:"9px 14px",fontSize:12,color:T.muted}}>{r.whName}</td>
+                <td style={{padding:"9px 14px",fontWeight:700,color:r.Quantity<=0?T.red:T.text}}>{r.Quantity}</td>
+                <td style={{padding:"9px 14px",fontSize:12,color:T.muted}}>{r.loc||"—"}</td>
+              </tr>
+            ))}
+            </tbody>
+          </table>
+        </div>
+        <div style={{display:"flex",justifyContent:"flex-end",marginTop:16}}>
+          <Btn variant="primary" disabled={selected.length===0} onClick={()=>setStep(2)}>Siguiente ({selected.length}) →</Btn>
+        </div>
+      </div>}
+
+      {step===2&&<div style={S.card}>
+        <div style={{display:"flex",gap:10,marginBottom:16,alignItems:"center"}}>
+          <div>
+            <label style={S.label}>Tipo de ajuste</label>
+            <div style={{display:"flex",gap:6}}>
+              {[{v:"entrada",l:"Entrada"},{v:"salida",l:"Salida"}].map(o=>(
+                <button key={o.v} onClick={()=>setTipo(o.v)} style={{padding:"7px 14px",border:`2px solid ${tipo===o.v?T.accent:T.border}`,borderRadius:8,cursor:"pointer",fontFamily:"inherit",fontSize:13,fontWeight:600,color:tipo===o.v?T.accent:T.muted,background:tipo===o.v?"rgba(5,146,167,0.06)":"#fff"}}>{o.l}</button>
+              ))}
+            </div>
+          </div>
+        </div>
+        <table style={{width:"100%",borderCollapse:"collapse",marginBottom:16}}>
+          <thead><tr>
+            <th style={thSt}>Producto</th>
+            <th style={thSt}>Stock actual</th>
+            <th style={thSt}>Cantidad a {tipo==="entrada"?"añadir":"quitar"}</th>
+            <th style={thSt}>Resultado</th>
+            {seePrices&&<th style={thSt}>P. Coste</th>}
+          </tr></thead>
+          <tbody>
+          {selected.map((s,i)=>{
+            const qty=parseFloat(s.cantidad)||0
+            const result=tipo==="entrada"?s.currentQty+qty:s.currentQty-qty
+            return <tr key={i} style={{borderBottom:`1px solid ${T.border}`}}>
+              <td style={{padding:"10px 14px",fontSize:13,fontWeight:600,color:T.text}}>{s.productName}</td>
+              <td style={{padding:"10px 14px",fontWeight:600}}>{s.currentQty}</td>
+              <td style={{padding:"10px 14px"}}>
+                <input type="number" min="0" step="0.001" value={s.cantidad} onChange={e=>updateLine(s.ProductId,"cantidad",e.target.value)} style={{...S.inp,width:100,textAlign:"right"}}/>
+              </td>
+              <td style={{padding:"10px 14px"}}><span style={{fontWeight:700,color:result<0?T.red:result===0?T.muted:T.green}}>{result.toFixed(3)}</span></td>
+              {seePrices&&<td style={{padding:"10px 14px"}}>
+                <input type="number" step="0.01" value={s.costPrice} onChange={e=>updateLine(s.ProductId,"costPrice",e.target.value)} style={{...S.inp,width:90,textAlign:"right"}} placeholder="€"/>
+              </td>}
+            </tr>
+          })}
+          </tbody>
+        </table>
+        <Field label="Motivo de regularización">
+          <input value={motivo} onChange={e=>setMotivo(e.target.value)} placeholder="Inventario periódico, merma, rotura…" style={S.inp}/>
+        </Field>
+        <div style={{display:"flex",gap:10,justifyContent:"space-between",marginTop:16}}>
+          <Btn variant="secondary" onClick={()=>setStep(1)}>← Volver</Btn>
+          <Btn variant="primary" onClick={()=>setStep(3)}>Revisar →</Btn>
+        </div>
+      </div>}
+
+      {step===3&&<div style={S.card}>
+        <h3 style={{fontSize:15,fontWeight:700,color:T.brand,marginBottom:16}}>Resumen — confirmar regularización</h3>
+        <div style={{background:T.bg,borderRadius:8,padding:14,marginBottom:16}}>
+          <div style={{fontSize:12,color:T.muted}}>Tipo: <strong style={{color:T.text}}>{tipo==="entrada"?"Entrada":"Salida"}</strong></div>
+          {motivo&&<div style={{fontSize:12,color:T.muted,marginTop:4}}>Motivo: <strong style={{color:T.text}}>{motivo}</strong></div>}
+        </div>
+        <table style={{width:"100%",borderCollapse:"collapse",marginBottom:16}}>
+          <thead><tr>
+            <th style={thSt}>Producto</th>
+            <th style={thSt}>Antes</th>
+            <th style={thSt}>Ajuste</th>
+            <th style={thSt}>Después</th>
+          </tr></thead>
+          <tbody>
+          {selected.filter(s=>parseFloat(s.cantidad)!==0).map((s,i)=>{
+            const qty=parseFloat(s.cantidad)||0
+            const result=tipo==="entrada"?s.currentQty+qty:s.currentQty-qty
+            return <tr key={i} style={{borderBottom:`1px solid ${T.border}`}}>
+              <td style={{padding:"9px 14px",fontSize:13,fontWeight:600}}>{s.productName}</td>
+              <td style={{padding:"9px 14px",color:T.muted}}>{s.currentQty}</td>
+              <td style={{padding:"9px 14px",color:tipo==="entrada"?T.green:T.red,fontWeight:700}}>{tipo==="entrada"?"+":"-"}{qty}</td>
+              <td style={{padding:"9px 14px",fontWeight:700,color:result<0?T.red:T.green}}>{result.toFixed(3)}</td>
+            </tr>
+          })}
+          </tbody>
+        </table>
+        <div style={{display:"flex",gap:10,justifyContent:"space-between"}}>
+          <Btn variant="secondary" onClick={()=>setStep(2)}>← Volver</Btn>
+          <Btn variant="primary" disabled={sending} onClick={confirmar}><Ic n={sending?"sync":"check"} s={13} spin={sending}/>{sending?"Enviando…":"Confirmar y enviar a Ágora"}</Btn>
+        </div>
+      </div>}
+
+      {showScanner&&<BarcodeScanner onScan={handleScan} onClose={()=>setShowScanner(false)}/>}
+    </div>
+  )
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  PEDIDOS REPOSICIÓN
+// ═══════════════════════════════════════════════════════════════════════════════
+function PedidosReposicionView({stockRows,products,warehouses,suppliers,conn,onCrear,toast,role}) {
+  const [suppId,setSuppId]=useState("")
+  const [whId,setWhId]=useState("")
+  const [lines,setLines]=useState([])
+  const [sending,setSending]=useState(false)
+  const [search,setSearch]=useState("")
+  const seePrices=PERMS.seeCostPrices(role)
+
+  const bajoMin=stockRows.filter(r=>r.minStock>0&&r.Quantity<r.minStock)
+
+  const addBajoMinimo=()=>{
+    const toAdd=bajoMin.filter(r=>!whId||String(r.WarehouseId)===whId)
+      .filter(r=>!lines.some(l=>l.ProductId===r.ProductId))
+    if(!toAdd.length){toast("Todos los productos bajo mínimo ya están en el pedido","warn");return}
+    setLines(prev=>[...prev,...toAdd.map(r=>({
+      ProductId:r.ProductId,
+      productName:r.prod?.Name||String(r.ProductId),
+      qty:String(Math.max(r.minStock-r.Quantity,1)),
+      costPrice:String(r.costPrice??0)
+    }))])
+    toast(`${toAdd.length} productos añadidos`)
+  }
+
+  const addProduct=(prod)=>{
+    if(lines.some(l=>l.ProductId===prod.Id)) return
+    setLines(prev=>[...prev,{ProductId:prod.Id,productName:prod.Name,qty:"1",costPrice:String(prod.CostPrice??0)}])
+    setSearch("")
+  }
+  const updateLine=(pid,field,val)=>setLines(prev=>prev.map(l=>l.ProductId===pid?{...l,[field]:val}:l))
+  const removeLine=(pid)=>setLines(prev=>prev.filter(l=>l.ProductId!==pid))
+
+  const searchResults=products.filter(p=>search&&(p.Name||"").toLowerCase().includes(search.toLowerCase())).slice(0,5)
+
+  const enviar=async()=>{
+    if(!lines.length){toast("Añade productos al pedido","err");return}
+    setSending(true)
+    try{
+      const pedido={
+        SupplierId:parseInt(suppId)||null,
+        WarehouseId:parseInt(whId)||null,
+        ExpectedDeliveryDate:new Date(Date.now()+7*864e5).toISOString().slice(0,10),
+        Notes:"Pedido de reposición StockIn",
+        Lines:lines.map(l=>({ProductId:l.ProductId,OrderedQuantity:parseFloat(l.qty)||1,CostPrice:parseFloat(l.costPrice)||0}))
+      }
+      await onCrear(pedido)
+      setLines([]);toast("Pedido enviado a Ágora ✓")
+    }catch(e){toast("Error: "+e.message,"err")}
+    finally{setSending(false)}
+  }
+
+  return (
+    <div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+        <h1 style={{fontSize:20,fontWeight:800,color:T.brand,margin:0}}>Pedido de reposición</h1>
+        <div style={{display:"flex",gap:8}}>
+          <Btn small variant="secondary" onClick={addBajoMinimo}><Ic n="alert" s={13}/>Añadir todos bajo mínimo ({bajoMin.length})</Btn>
+          <Btn small variant="primary" disabled={sending||!lines.length} onClick={enviar}><Ic n={sending?"sync":"cart"} s={13} spin={sending}/>{sending?"Enviando…":"Enviar a Ágora"}</Btn>
+        </div>
+      </div>
+      <div style={{display:"flex",gap:14,marginBottom:14,flexWrap:"wrap"}}>
+        <div style={{flex:"1 1 200px"}}>
+          <label style={S.label}>Proveedor</label>
+          <select value={suppId} onChange={e=>setSuppId(e.target.value)} style={S.inp}>
+            <option value="">Sin proveedor específico</option>
+            {suppliers.map(s=><option key={s.Id} value={String(s.Id)}>{s.Name}</option>)}
+          </select>
+        </div>
+        <div style={{flex:"1 1 160px"}}>
+          <label style={S.label}>Almacén destino</label>
+          <select value={whId} onChange={e=>setWhId(e.target.value)} style={S.inp}>
+            <option value="">Sin especificar</option>
+            {warehouses.map(w=><option key={w.Id} value={String(w.Id)}>{w.Name}</option>)}
+          </select>
+        </div>
+      </div>
+
+      <div style={S.card}>
+        <div style={{position:"relative",marginBottom:14}}>
+          <Ic n="search" s={14} style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",color:T.muted,pointerEvents:"none"}}/>
+          <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Añadir producto por nombre…" style={{...S.inp,paddingLeft:34}}/>
+          {searchResults.length>0&&<div style={{position:"absolute",top:"100%",left:0,right:0,background:"#fff",border:`1px solid ${T.border}`,borderRadius:8,boxShadow:"0 8px 24px rgba(3,70,80,0.12)",zIndex:50}}>
+            {searchResults.map(p=><div key={p.Id} onClick={()=>addProduct(p)} style={{padding:"9px 14px",cursor:"pointer",fontSize:13,borderBottom:`1px solid ${T.border}`}}
+              onMouseEnter={e=>e.currentTarget.style.background="#f5f9fa"}
+              onMouseLeave={e=>e.currentTarget.style.background="#fff"}>
+              {p.Name}
+            </div>)}
+          </div>}
+        </div>
+
+        {lines.length===0
+          ?<Empty msg="Añade productos o pulsa «Añadir todos bajo mínimo»" icon="cart"/>
+          :<table style={{width:"100%",borderCollapse:"collapse"}}>
+            <thead><tr>
+              <th style={thSt}>Producto</th>
+              <th style={thSt}>Cantidad</th>
+              {seePrices&&<th style={thSt}>P. Coste</th>}
+              <th style={thSt}></th>
+            </tr></thead>
+            <tbody>
+            {lines.map((l,i)=>(
+              <tr key={i} style={{borderBottom:`1px solid ${T.border}`}}>
+                <td style={{padding:"10px 14px",fontSize:13,fontWeight:600,color:T.text}}>{l.productName}</td>
+                <td style={{padding:"10px 14px"}}>
+                  <input type="number" min="0" step="0.001" value={l.qty} onChange={e=>updateLine(l.ProductId,"qty",e.target.value)} style={{...S.inp,width:90,textAlign:"right"}}/>
+                </td>
+                {seePrices&&<td style={{padding:"10px 14px"}}>
+                  <input type="number" step="0.01" value={l.costPrice} onChange={e=>updateLine(l.ProductId,"costPrice",e.target.value)} style={{...S.inp,width:90,textAlign:"right"}} placeholder="€"/>
+                </td>}
+                <td style={{padding:"10px 14px"}}>
+                  <Btn small variant="danger" onClick={()=>removeLine(l.ProductId)}><Ic n="trash" s={12}/></Btn>
+                </td>
+              </tr>
+            ))}
+            </tbody>
+          </table>
+        }
+      </div>
+    </div>
+  )
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  HISTORICO VIEW
+// ═══════════════════════════════════════════════════════════════════════════════
+function HistoricoView({albaranes,traspasos,warehouses}) {
+  const [tab,setTab]=useState("albaranes")
+  const [search,setSearch]=useState("")
+  const fmtDate=(d)=>{if(!d)return"—";try{return new Date(d).toLocaleDateString("es-ES",{day:"2-digit",month:"2-digit",year:"numeric"})}catch{return d}}
+  const tabStyle=(t)=>({padding:"7px 14px",border:"none",cursor:"pointer",background:tab===t?T.accent:"transparent",color:tab===t?"#fff":T.muted,borderRadius:6,fontSize:12,fontWeight:600,fontFamily:"inherit"})
+  const wh=(id)=>warehouses.find(w=>w.Id===id)?.Name||`Almacén ${id}`
+
+  const filtAlb=albaranes.filter(a=>!search||(a.Supplier?.Name||"").toLowerCase().includes(search.toLowerCase()))
+  const filtTr=traspasos.filter(t=>!search||wh(t.SourceWarehouseId).toLowerCase().includes(search.toLowerCase())||wh(t.TargetWarehouseId).toLowerCase().includes(search.toLowerCase()))
+
+  return (
+    <div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18}}>
+        <h1 style={{fontSize:20,fontWeight:800,color:T.brand,margin:0}}>Historial de movimientos</h1>
+      </div>
+      <div style={{display:"flex",gap:8,marginBottom:14,alignItems:"center",flexWrap:"wrap"}}>
+        <div style={{display:"flex",gap:4,background:T.bg,padding:4,borderRadius:9}}>
+          <button style={tabStyle("albaranes")} onClick={()=>setTab("albaranes")}>Albaranes ({albaranes.length})</button>
+          <button style={tabStyle("traspasos")} onClick={()=>setTab("traspasos")}>Traspasos ({traspasos.length})</button>
+        </div>
+        <div style={{position:"relative",flex:"1 1 200px"}}>
+          <Ic n="search" s={14} style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",color:T.muted,pointerEvents:"none"}}/>
+          <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Buscar…" style={{...S.inp,paddingLeft:34}}/>
+        </div>
+      </div>
+
+      {tab==="albaranes"&&<div style={{...S.card,padding:0,overflow:"auto"}}>
+        {filtAlb.length===0?<Empty msg="Sin albaranes" icon="albaran"/>:
+        <table style={{width:"100%",borderCollapse:"collapse",minWidth:600}}>
+          <thead><tr>
+            {["Fecha","Proveedor","Almacén","Líneas","Total","Estado"].map(h=><th key={h} style={thSt}>{h}</th>)}
+          </tr></thead>
+          <tbody>
+          {filtAlb.map((a,i)=>{
+            const total=(a.Lines||[]).reduce((s,l)=>(s+(l.DeliveredQuantity||l.OrderedQuantity||0)*(l.CostPrice||0)),0)
+            return <tr key={i} style={{background:i%2?"#f8fbfb":"#fff",borderBottom:`1px solid ${T.border}`}}>
+              <td style={{padding:"9px 14px",fontSize:12,color:T.muted,whiteSpace:"nowrap"}}>{fmtDate(a.Date)}</td>
+              <td style={{padding:"9px 14px",fontSize:13,fontWeight:600,color:T.text}}>{a.Supplier?.Name||a.SupplierId||"—"}</td>
+              <td style={{padding:"9px 14px",fontSize:12,color:T.muted}}>{a.Warehouse?.Name||wh(a.WarehouseId)||"—"}</td>
+              <td style={{padding:"9px 14px",fontSize:12,color:T.muted}}>{(a.Lines||[]).length}</td>
+              <td style={{padding:"9px 14px",fontSize:12,fontWeight:600}}>€{fmt(total)}</td>
+              <td style={{padding:"9px 14px"}}><StatusBadge status={a.Status}/></td>
+            </tr>
+          })}
+          </tbody>
+        </table>}
+      </div>}
+
+      {tab==="traspasos"&&<div style={{...S.card,padding:0,overflow:"auto"}}>
+        {filtTr.length===0?<Empty msg="Sin traspasos" icon="transfer"/>:
+        <table style={{width:"100%",borderCollapse:"collapse",minWidth:500}}>
+          <thead><tr>
+            {["Fecha","Origen","Destino","Líneas","Estado"].map(h=><th key={h} style={thSt}>{h}</th>)}
+          </tr></thead>
+          <tbody>
+          {filtTr.map((t,i)=>(
+            <tr key={i} style={{background:i%2?"#f8fbfb":"#fff",borderBottom:`1px solid ${T.border}`}}>
+              <td style={{padding:"9px 14px",fontSize:12,color:T.muted,whiteSpace:"nowrap"}}>{fmtDate(t.TransferDate||t._date)}</td>
+              <td style={{padding:"9px 14px",fontSize:13,fontWeight:600,color:T.text}}>{wh(t.SourceWarehouseId)}</td>
+              <td style={{padding:"9px 14px",fontSize:13,fontWeight:600,color:T.accent}}>{wh(t.TargetWarehouseId)}</td>
+              <td style={{padding:"9px 14px",fontSize:12,color:T.muted}}>{(t.Lines||[]).length}</td>
+              <td style={{padding:"9px 14px"}}>{t._local?<Badge color={T.yellow} label="Local"/>:<StatusBadge status={t.Status}/>}</td>
+            </tr>
+          ))}
+          </tbody>
+        </table>}
+      </div>}
+    </div>
+  )
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  ALBARANES VIEW
+// ═══════════════════════════════════════════════════════════════════════════════
+function AlbaranForm({products,suppliers,warehouses,onSave,onCancel,toast}) {
+  const [suppId,setSuppId]=useState("")
+  const [whId,setWhId]=useState("")
+  const [date,setDate]=useState(today())
+  const [ref,setRef]=useState("")
+  const [lines,setLines]=useState([])
+  const [search,setSearch]=useState("")
+  const [showScanner,setShowScanner]=useState(false)
+  const [sending,setSending]=useState(false)
+
+  const searchResults=products.filter(p=>search&&(p.Name||"").toLowerCase().includes(search.toLowerCase())).slice(0,6)
+
+  const addProduct=(prod)=>{
+    if(!lines.some(l=>l.ProductId===prod.Id)){
+      setLines(prev=>[...prev,{ProductId:prod.Id,productName:prod.Name,qty:"1",costPrice:String(prod.CostPrice??0)}])
+    }
+    setSearch("")
+  }
+
+  const handleScan=(barcode)=>{
+    const prod=products.find(p=>p.Barcode===barcode||p.Reference===barcode)
+    if(!prod){toast("Código no encontrado: "+barcode,"err");return}
+    addProduct(prod)
+    toast("Producto añadido: "+prod.Name)
+  }
+
+  const updateLine=(pid,field,val)=>setLines(prev=>prev.map(l=>l.ProductId===pid?{...l,[field]:val}:l))
+  const removeLine=(pid)=>setLines(prev=>prev.filter(l=>l.ProductId!==pid))
+
+  const save=async()=>{
+    if(!lines.length){toast("Añade al menos un producto","err");return}
+    setSending(true)
+    try{
+      const albaran={
+        SupplierId:parseInt(suppId)||null,
+        WarehouseId:parseInt(whId)||null,
+        Date:date,
+        Reference:ref||null,
+        Status:"Pending",
+        Notes:"Albarán StockIn",
+        Lines:lines.map(l=>({ProductId:l.ProductId,DeliveredQuantity:parseFloat(l.qty)||1,CostPrice:parseFloat(l.costPrice)||0}))
+      }
+      await onSave(albaran)
+    }catch(e){toast("Error: "+e.message,"err")}
+    finally{setSending(false)}
+  }
+
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:14}}>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+        <Field label="Proveedor">
+          <select value={suppId} onChange={e=>setSuppId(e.target.value)} style={S.inp}>
+            <option value="">Sin proveedor</option>
+            {suppliers.map(s=><option key={s.Id} value={String(s.Id)}>{s.Name}</option>)}
+          </select>
+        </Field>
+        <Field label="Almacén">
+          <select value={whId} onChange={e=>setWhId(e.target.value)} style={S.inp}>
+            <option value="">Sin especificar</option>
+            {warehouses.map(w=><option key={w.Id} value={String(w.Id)}>{w.Name}</option>)}
+          </select>
+        </Field>
+        <Field label="Fecha">
+          <input type="date" value={date} onChange={e=>setDate(e.target.value)} style={S.inp}/>
+        </Field>
+        <Field label="Referencia (opcional)">
+          <input value={ref} onChange={e=>setRef(e.target.value)} placeholder="Ej: ALB-2024-001" style={S.inp}/>
+        </Field>
+      </div>
+      <div>
+        <label style={S.label}>Productos</label>
+        <div style={{position:"relative",marginBottom:8,display:"flex",gap:8}}>
+          <div style={{position:"relative",flex:1}}>
+            <Ic n="search" s={14} style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",color:T.muted,pointerEvents:"none"}}/>
+            <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Buscar y añadir producto…" style={{...S.inp,paddingLeft:34}}/>
+            {searchResults.length>0&&<div style={{position:"absolute",top:"100%",left:0,right:0,background:"#fff",border:`1px solid ${T.border}`,borderRadius:8,boxShadow:"0 8px 24px rgba(3,70,80,0.12)",zIndex:50}}>
+              {searchResults.map(p=><div key={p.Id} onClick={()=>addProduct(p)} style={{padding:"9px 14px",cursor:"pointer",fontSize:13,borderBottom:`1px solid ${T.border}`}}
+                onMouseEnter={e=>e.currentTarget.style.background="#f5f9fa"}
+                onMouseLeave={e=>e.currentTarget.style.background="#fff"}>{p.Name}</div>)}
+            </div>}
+          </div>
+          <Btn small variant="secondary" onClick={()=>setShowScanner(true)}><Ic n="camera" s={13}/>Escanear</Btn>
+        </div>
+        {lines.length>0&&<table style={{width:"100%",borderCollapse:"collapse"}}>
+          <thead><tr>
+            <th style={thSt}>Producto</th>
+            <th style={thSt}>Cantidad</th>
+            <th style={thSt}>P. Coste</th>
+            <th style={thSt}></th>
+          </tr></thead>
+          <tbody>
+          {lines.map((l,i)=>(
+            <tr key={i} style={{borderBottom:`1px solid ${T.border}`}}>
+              <td style={{padding:"9px 14px",fontSize:13,fontWeight:600,color:T.text}}>{l.productName}</td>
+              <td style={{padding:"9px 14px"}}><input type="number" min="0" step="0.001" value={l.qty} onChange={e=>updateLine(l.ProductId,"qty",e.target.value)} style={{...S.inp,width:90,textAlign:"right"}}/></td>
+              <td style={{padding:"9px 14px"}}><input type="number" step="0.01" value={l.costPrice} onChange={e=>updateLine(l.ProductId,"costPrice",e.target.value)} style={{...S.inp,width:90,textAlign:"right"}} placeholder="€"/></td>
+              <td style={{padding:"9px 14px"}}><Btn small variant="danger" onClick={()=>removeLine(l.ProductId)}><Ic n="trash" s={12}/></Btn></td>
+            </tr>
+          ))}
+          </tbody>
+        </table>}
+      </div>
+      <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
+        <Btn variant="ghost" onClick={onCancel}>Cancelar</Btn>
+        <Btn variant="primary" disabled={sending||!lines.length} onClick={save}><Ic n={sending?"sync":"check"} s={13} spin={sending}/>{sending?"Enviando…":"Guardar albarán"}</Btn>
+      </div>
+      {showScanner&&<BarcodeScanner onScan={handleScan} onClose={()=>setShowScanner(false)}/>}
+    </div>
+  )
+}
+
+function AlbaranesView({albaranes,products,suppliers,warehouses,conn,onImportar,toast,role}) {
+  const [showForm,setShowForm]=useState(false)
+  const [search,setSearch]=useState("")
+  const fmtDate=(d)=>{if(!d)return"—";try{return new Date(d).toLocaleDateString("es-ES",{day:"2-digit",month:"2-digit",year:"numeric"})}catch{return d}}
+  const filtered=albaranes.filter(a=>!search||(a.Supplier?.Name||"").toLowerCase().includes(search.toLowerCase()))
+
+  const handleSave=async(alb)=>{
+    await onImportar(alb)
+    setShowForm(false)
+    toast("Albarán guardado ✓")
+  }
+
+  if(showForm) return (
+    <div>
+      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:20}}>
+        <Btn small variant="ghost" onClick={()=>setShowForm(false)}>← Volver</Btn>
+        <h1 style={{fontSize:20,fontWeight:800,color:T.brand,margin:0}}>Nuevo albarán</h1>
+      </div>
+      <div style={S.card}>
+        <AlbaranForm products={products} suppliers={suppliers} warehouses={warehouses} onSave={handleSave} onCancel={()=>setShowForm(false)} toast={toast}/>
+      </div>
+    </div>
+  )
+
+  return (
+    <div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18}}>
+        <h1 style={{fontSize:20,fontWeight:800,color:T.brand,margin:0}}>Albaranes</h1>
+        <Btn small variant="primary" onClick={()=>setShowForm(true)}><Ic n="plus" s={13}/>Nuevo albarán</Btn>
+      </div>
+      <div style={{position:"relative",marginBottom:14}}>
+        <Ic n="search" s={14} style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",color:T.muted,pointerEvents:"none"}}/>
+        <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Buscar por proveedor…" style={{...S.inp,paddingLeft:34,maxWidth:360}}/>
+      </div>
+      <div style={{...S.card,padding:0,overflow:"auto"}}>
+        {filtered.length===0?<Empty msg="Sin albaranes" icon="albaran"/>:
+        <table style={{width:"100%",borderCollapse:"collapse",minWidth:580}}>
+          <thead><tr>
+            {["Fecha","Proveedor","Almacén","Líneas","Estado"].map(h=><th key={h} style={thSt}>{h}</th>)}
+          </tr></thead>
+          <tbody>
+          {filtered.map((a,i)=>(
+            <tr key={i} style={{background:i%2?"#f8fbfb":"#fff",borderBottom:`1px solid ${T.border}`}}>
+              <td style={{padding:"9px 14px",fontSize:12,color:T.muted,whiteSpace:"nowrap"}}>{fmtDate(a.Date)}</td>
+              <td style={{padding:"9px 14px",fontSize:13,fontWeight:600,color:T.text}}>{a.Supplier?.Name||a.SupplierId||"—"}</td>
+              <td style={{padding:"9px 14px",fontSize:12,color:T.muted}}>{a.Warehouse?.Name||`Almacén ${a.WarehouseId}`||"—"}</td>
+              <td style={{padding:"9px 14px",fontSize:12,color:T.muted}}>{(a.Lines||[]).length}</td>
+              <td style={{padding:"9px 14px"}}><StatusBadge status={a.Status}/></td>
+            </tr>
+          ))}
+          </tbody>
+        </table>}
+      </div>
+    </div>
+  )
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  TRASPASOS VIEW
+// ═══════════════════════════════════════════════════════════════════════════════
+function TraspasosView({traspasos,products,warehouses,conn,onImportar,toast,stockRows}) {
+  const [srcId,setSrcId]=useState("")
+  const [dstId,setDstId]=useState("")
+  const [lines,setLines]=useState([])
+  const [search,setSearch]=useState("")
+  const [sending,setSending]=useState(false)
+
+  const searchResults=products.filter(p=>search&&(p.Name||"").toLowerCase().includes(search.toLowerCase())).slice(0,6)
+  const addProduct=(prod)=>{
+    if(!lines.some(l=>l.ProductId===prod.Id)){
+      const row=stockRows.find(r=>r.ProductId===prod.Id&&(!srcId||String(r.WarehouseId)===srcId))
+      setLines(prev=>[...prev,{ProductId:prod.Id,productName:prod.Name,qty:"1",available:row?.Quantity??null}])
+    }
+    setSearch("")
+  }
+  const updateLine=(pid,val)=>setLines(prev=>prev.map(l=>l.ProductId===pid?{...l,qty:val}:l))
+  const removeLine=(pid)=>setLines(prev=>prev.filter(l=>l.ProductId!==pid))
+
+  const enviar=async()=>{
+    if(!srcId||!dstId){toast("Selecciona almacén origen y destino","err");return}
+    if(srcId===dstId){toast("Origen y destino deben ser distintos","err");return}
+    if(!lines.length){toast("Añade productos al traspaso","err");return}
+    setSending(true)
+    try{
+      const traspaso={
+        SourceWarehouseId:parseInt(srcId),
+        TargetWarehouseId:parseInt(dstId),
+        TransferDate:today(),
+        Notes:"Traspaso StockIn",
+        Lines:lines.map(l=>({ProductId:l.ProductId,Quantity:parseFloat(l.qty)||1}))
+      }
+      await onImportar(traspaso)
+      setLines([]);toast("Traspaso enviado ✓")
+    }catch(e){toast("Error: "+e.message,"err")}
+    finally{setSending(false)}
+  }
+
+  return (
+    <div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+        <h1 style={{fontSize:20,fontWeight:800,color:T.brand,margin:0}}>Traspasos entre almacenes</h1>
+        <Btn small variant="primary" disabled={sending||!lines.length} onClick={enviar}><Ic n={sending?"sync":"transfer"} s={13} spin={sending}/>{sending?"Enviando…":"Enviar traspaso"}</Btn>
+      </div>
+      <div style={{...S.card,marginBottom:16}}>
+        <div style={{display:"grid",gridTemplateColumns:"1fr auto 1fr",gap:12,alignItems:"center"}}>
+          <div>
+            <label style={S.label}>Almacén origen</label>
+            <select value={srcId} onChange={e=>setSrcId(e.target.value)} style={S.inp}>
+              <option value="">Seleccionar…</option>
+              {warehouses.map(w=><option key={w.Id} value={String(w.Id)}>{w.Name}</option>)}
+            </select>
+          </div>
+          <div style={{textAlign:"center",color:T.muted,fontSize:22}}>→</div>
+          <div>
+            <label style={S.label}>Almacén destino</label>
+            <select value={dstId} onChange={e=>setDstId(e.target.value)} style={S.inp}>
+              <option value="">Seleccionar…</option>
+              {warehouses.filter(w=>String(w.Id)!==srcId).map(w=><option key={w.Id} value={String(w.Id)}>{w.Name}</option>)}
+            </select>
+          </div>
+        </div>
+      </div>
+      <div style={S.card}>
+        <div style={{position:"relative",marginBottom:14}}>
+          <Ic n="search" s={14} style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",color:T.muted,pointerEvents:"none"}}/>
+          <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Añadir producto…" style={{...S.inp,paddingLeft:34}}/>
+          {searchResults.length>0&&<div style={{position:"absolute",top:"100%",left:0,right:0,background:"#fff",border:`1px solid ${T.border}`,borderRadius:8,boxShadow:"0 8px 24px rgba(3,70,80,0.12)",zIndex:50}}>
+            {searchResults.map(p=><div key={p.Id} onClick={()=>addProduct(p)} style={{padding:"9px 14px",cursor:"pointer",fontSize:13,borderBottom:`1px solid ${T.border}`}}
+              onMouseEnter={e=>e.currentTarget.style.background="#f5f9fa"}
+              onMouseLeave={e=>e.currentTarget.style.background="#fff"}>{p.Name}</div>)}
+          </div>}
+        </div>
+        {lines.length===0
+          ?<Empty msg="Busca y añade los productos a traspasar" icon="transfer"/>
+          :<table style={{width:"100%",borderCollapse:"collapse"}}>
+            <thead><tr>
+              <th style={thSt}>Producto</th>
+              <th style={thSt}>Disponible en origen</th>
+              <th style={thSt}>Cantidad a traspasar</th>
+              <th style={thSt}></th>
+            </tr></thead>
+            <tbody>
+            {lines.map((l,i)=>(
+              <tr key={i} style={{borderBottom:`1px solid ${T.border}`}}>
+                <td style={{padding:"10px 14px",fontSize:13,fontWeight:600,color:T.text}}>{l.productName}</td>
+                <td style={{padding:"10px 14px",fontSize:12,color:T.muted}}>{l.available!=null?l.available:"—"}</td>
+                <td style={{padding:"10px 14px"}}><input type="number" min="0" step="0.001" value={l.qty} onChange={e=>updateLine(l.ProductId,e.target.value)} style={{...S.inp,width:100,textAlign:"right"}}/></td>
+                <td style={{padding:"10px 14px"}}><Btn small variant="danger" onClick={()=>removeLine(l.ProductId)}><Ic n="trash" s={12}/></Btn></td>
+              </tr>
+            ))}
+            </tbody>
+          </table>
+        }
+      </div>
+    </div>
+  )
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  PRODUCTOS VIEW
+// ═══════════════════════════════════════════════════════════════════════════════
+function ProductosView({products,warehouses,suppliers,conn,onSave,toast,role}) {
+  const [search,setSearch]=useState("")
+  const [editing,setEditing]=useState(null) // product object being edited
+  const [saving,setSaving]=useState(false)
+  const seePrices=PERMS.seeCostPrices(role)
+
+  const filtered=products.filter(p=>!search||(p.Name||"").toLowerCase().includes(search.toLowerCase())||(p.Reference||"").toLowerCase().includes(search.toLowerCase()))
+
+  const edit=(prod)=>{
+    const p={...prod,
+      StorageOptions:(prod.StorageOptions||[]).map(so=>({...so})),
+      CostPrices:(prod.CostPrices||[]).map(cp=>({...cp}))
+    }
+    // Ensure every warehouse has a StorageOption entry
+    warehouses.forEach(w=>{
+      if(!p.StorageOptions.find(so=>so.WarehouseId===w.Id))
+        p.StorageOptions.push({WarehouseId:w.Id,Location:"",MinStock:0,MaxStock:0})
+      if(seePrices&&!p.CostPrices.find(cp=>cp.WarehouseId===w.Id))
+        p.CostPrices.push({WarehouseId:w.Id,CostPrice:prod.CostPrice||0})
+    })
+    setEditing(p)
+  }
+
+  const updateSO=(whId,field,val)=>setEditing(prev=>({...prev,StorageOptions:prev.StorageOptions.map(so=>so.WarehouseId===whId?{...so,[field]:val}:so)}))
+  const updateCP=(whId,val)=>setEditing(prev=>({...prev,CostPrices:prev.CostPrices.map(cp=>cp.WarehouseId===whId?{...cp,CostPrice:val}:cp)}))
+
+  const save=async()=>{
+    setSaving(true)
+    try{
+      await onSave(editing)
+      toast("Producto actualizado ✓")
+      setEditing(null)
+    }catch(e){toast("Error: "+e.message,"err")}
+    finally{setSaving(false)}
+  }
+
+  if(editing) return (
+    <div>
+      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:20}}>
+        <Btn small variant="ghost" onClick={()=>setEditing(null)}>← Volver</Btn>
+        <h1 style={{fontSize:18,fontWeight:800,color:T.brand,margin:0,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{editing.Name}</h1>
+        <Btn small variant="primary" disabled={saving} onClick={save}><Ic n={saving?"sync":"check"} s={13} spin={saving}/>{saving?"Guardando…":"Guardar"}</Btn>
+      </div>
+      <div style={S.card}>
+        {seePrices&&<div style={{marginBottom:20}}>
+          <div style={{fontSize:12,fontWeight:700,color:T.brand,marginBottom:10,textTransform:"uppercase",letterSpacing:"0.06em"}}>Precio de coste global</div>
+          <input type="number" step="0.01" value={editing.CostPrice||0} onChange={e=>setEditing(p=>({...p,CostPrice:e.target.value}))} style={{...S.inp,maxWidth:160}} placeholder="€ Coste"/>
+        </div>}
+        <div style={{fontSize:12,fontWeight:700,color:T.brand,marginBottom:10,textTransform:"uppercase",letterSpacing:"0.06em"}}>Stock mínimo / máximo por almacén</div>
+        <div style={{display:"flex",flexDirection:"column",gap:12}}>
+          {warehouses.map(w=>{
+            const so=editing.StorageOptions?.find(s=>s.WarehouseId===w.Id)||{}
+            const cp=editing.CostPrices?.find(c=>c.WarehouseId===w.Id)||{}
+            return <div key={w.Id} style={{padding:14,borderRadius:10,border:`1px solid ${T.border}`,background:"#f8fbfb"}}>
+              <div style={{fontWeight:600,color:T.brand,marginBottom:10,fontSize:13}}>{w.Name}</div>
+              <div style={{display:"flex",gap:10,flexWrap:"wrap",alignItems:"flex-end"}}>
+                <Field label="Ubicación"><input value={so.Location||""} onChange={e=>updateSO(w.Id,"Location",e.target.value)} style={{...S.inp,width:120}} placeholder="Ej: A-1-2"/></Field>
+                <Field label="Stock mínimo"><input type="number" step="0.001" value={so.MinStock||0} onChange={e=>updateSO(w.Id,"MinStock",e.target.value)} style={{...S.inp,width:90}}/></Field>
+                <Field label="Stock máximo"><input type="number" step="0.001" value={so.MaxStock||0} onChange={e=>updateSO(w.Id,"MaxStock",e.target.value)} style={{...S.inp,width:90}}/></Field>
+                {seePrices&&<Field label="P. Coste en este almacén"><input type="number" step="0.01" value={cp.CostPrice||0} onChange={e=>updateCP(w.Id,e.target.value)} style={{...S.inp,width:100}} placeholder="€"/></Field>}
+              </div>
+            </div>
+          })}
+        </div>
+      </div>
+    </div>
+  )
+
+  return (
+    <div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18}}>
+        <h1 style={{fontSize:20,fontWeight:800,color:T.brand,margin:0}}>Productos</h1>
+        <div style={{fontSize:13,color:T.muted}}>{filtered.length} productos</div>
+      </div>
+      <div style={{position:"relative",marginBottom:14}}>
+        <Ic n="search" s={14} style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",color:T.muted,pointerEvents:"none"}}/>
+        <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Buscar por nombre o referencia…" style={{...S.inp,paddingLeft:34,maxWidth:400}}/>
+      </div>
+      <div style={{...S.card,padding:0,overflow:"auto"}}>
+        {filtered.length===0?<Empty msg="Sin productos" icon="box"/>:
+        <table style={{width:"100%",borderCollapse:"collapse",minWidth:520}}>
+          <thead><tr>
+            <th style={thSt}>Producto</th>
+            <th style={thSt}>Ref</th>
+            <th style={thSt}>Familia</th>
+            {seePrices&&<th style={thSt}>P. Coste</th>}
+            <th style={thSt}>P. Venta</th>
+            <th style={thSt}></th>
+          </tr></thead>
+          <tbody>
+          {filtered.map((p,i)=>(
+            <tr key={p.Id} style={{background:i%2?"#f8fbfb":"#fff",borderBottom:`1px solid ${T.border}`}}>
+              <td style={{padding:"9px 14px",fontSize:13,fontWeight:600,color:T.text,maxWidth:260,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.Name}</td>
+              <td style={{padding:"9px 14px",fontSize:11,color:T.muted,fontFamily:"monospace"}}>{p.Reference||"—"}</td>
+              <td style={{padding:"9px 14px",fontSize:12,color:T.muted}}>{p.FamilyName||"—"}</td>
+              {seePrices&&<td style={{padding:"9px 14px",fontSize:12,color:T.muted}}>€{fmt(p.CostPrice??0)}</td>}
+              <td style={{padding:"9px 14px",fontSize:12,color:T.muted}}>€{fmt(p.Prices?.[0]?.Price??0)}</td>
+              <td style={{padding:"9px 14px"}}><Btn small variant="secondary" onClick={()=>edit(p)}><Ic n="settings" s={12}/>Editar</Btn></td>
+            </tr>
+          ))}
+          </tbody>
+        </table>}
+      </div>
+    </div>
+  )
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  PROVEEDORES VIEW
+// ═══════════════════════════════════════════════════════════════════════════════
+function ProveedoresView({suppliers,albaranes}) {
+  const [search,setSearch]=useState("")
+  const filtered=suppliers.filter(s=>!search||(s.Name||"").toLowerCase().includes(search.toLowerCase()))
+  const countAlb=(suppId)=>albaranes.filter(a=>a.SupplierId===suppId||a.Supplier?.Id===suppId).length
+  const lastAlb=(suppId)=>{
+    const albs=albaranes.filter(a=>a.SupplierId===suppId||a.Supplier?.Id===suppId).sort((a,b)=>new Date(b.Date)-new Date(a.Date))
+    if(!albs.length) return "—"
+    try{return new Date(albs[0].Date).toLocaleDateString("es-ES",{day:"2-digit",month:"2-digit",year:"numeric"})}catch{return albs[0].Date}
+  }
+  return (
+    <div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18}}>
+        <h1 style={{fontSize:20,fontWeight:800,color:T.brand,margin:0}}>Proveedores</h1>
+        <div style={{fontSize:13,color:T.muted}}>{filtered.length} proveedores</div>
+      </div>
+      <div style={{position:"relative",marginBottom:14}}>
+        <Ic n="search" s={14} style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",color:T.muted,pointerEvents:"none"}}/>
+        <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Buscar proveedor…" style={{...S.inp,paddingLeft:34,maxWidth:360}}/>
+      </div>
+      <div style={S.card}>
+        {filtered.length===0?<Empty msg="Sin proveedores" icon="proveedor"/>:
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:12}}>
+          {filtered.map(s=>(
+            <div key={s.Id} style={{border:`1px solid ${T.border}`,borderRadius:10,padding:16}}>
+              <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
+                <div style={{width:38,height:38,borderRadius:9,background:T.brand,display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,fontWeight:700,color:"#fff",flexShrink:0}}>{(s.Name||"?")[0].toUpperCase()}</div>
+                <div style={{fontWeight:700,color:T.text,fontSize:14,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{s.Name}</div>
+              </div>
+              {s.Email&&<div style={{fontSize:12,color:T.muted,marginBottom:3}}>✉ {s.Email}</div>}
+              {s.Phone&&<div style={{fontSize:12,color:T.muted,marginBottom:3}}>📞 {s.Phone}</div>}
+              {s.ContactName&&<div style={{fontSize:12,color:T.muted,marginBottom:3}}>👤 {s.ContactName}</div>}
+              <div style={{marginTop:10,paddingTop:10,borderTop:`1px solid ${T.border}`,display:"flex",gap:14}}>
+                <div style={{fontSize:11,color:T.muted}}>Albaranes: <strong style={{color:T.text}}>{countAlb(s.Id)}</strong></div>
+                <div style={{fontSize:11,color:T.muted}}>Último: <strong style={{color:T.text}}>{lastAlb(s.Id)}</strong></div>
+              </div>
+            </div>
+          ))}
+        </div>}
+      </div>
+    </div>
+  )
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 //  APP ROOT
 // ═══════════════════════════════════════════════════════════════════════════════
 export default function App() {
-  // ── Auth state ──────────────────────────────────────────────────────────────
-  const [user,     setUser]     = useState(null)   // {id,username,role,fullName}
-  const [authLoading, setAuthLoading] = useState(true)
+  // ── Auth ────────────────────────────────────────────────────────────────────
+  const [user,      setUser]      = useState(null)
+  const [authLoading,setAuthLoading] = useState(true)
 
-  // ── Connection state ────────────────────────────────────────────────────────
+  // ── Connections ─────────────────────────────────────────────────────────────
   const [connections,setConnections]=useState(loadConnections)
   const [activeId,   setActiveId]   =useState(loadActiveId)
   const [view,       setView]       =useState("dashboard")
@@ -345,31 +1575,39 @@ export default function App() {
   const [notif,     setNotif]     =useState(null)
   const [cachedAt,  setCachedAt]  =useState(null)
 
-  // ── Offline queue ───────────────────────────────────────────────────────────
-  const [online,      setOnline]      =useState(navigator.onLine)
-  const [queueCount,  setQueueCount]  =useState(0)
-  const [showBanner,  setShowBanner]  =useState(false)
+  // ── Offline ──────────────────────────────────────────────────────────────────
+  const [online,     setOnline]     =useState(navigator.onLine)
+  const [queueCount, setQueueCount] =useState(0)
+  const [showBanner, setShowBanner] =useState(false)
+
+  // ── Auto-sync ────────────────────────────────────────────────────────────────
+  const [autoSyncInterval,setAutoSyncInterval]=useState(()=>parseInt(localStorage.getItem("stockin_auto_sync")||"0"))
+  const [syncCountdown,   setSyncCountdown]   =useState(0)
+
+  // ── WhatsApp ─────────────────────────────────────────────────────────────────
+  const [whatsappCfg,setWhatsappCfg]=useState(()=>{
+    try{return JSON.parse(localStorage.getItem("stockin_whatsapp")||"{}")}catch{return{}}
+  })
 
   const activeConn=connections.find(c=>c.id===activeId)||null
   const configured=!!(activeConn?.apiToken)
-  const role = user?.role || "readonly"
-  const canSeeNav = (id) => (NAV_ACCESS[role]||[]).includes(id)
+  const role=user?.role||"readonly"
+  const canSeeNav=(id)=>(NAV_ACCESS[role]||[]).includes(id)
 
-  // ── Check auth on start ─────────────────────────────────────────────────────
+  // ── Auth check on mount ──────────────────────────────────────────────────────
   useEffect(()=>{
     const token=localStorage.getItem("stockin_token")
     if(!token){setAuthLoading(false);return}
     authAPI.me().then(u=>{setUser(u);setAuthLoading(false)}).catch(()=>{localStorage.removeItem("stockin_token");setAuthLoading(false)})
   },[])
 
-  // ── Initial sync after auth ─────────────────────────────────────────────────
   useEffect(()=>{
     if(!user) return
     if(configured){setView("dashboard");doSync(activeConn)}
     else if(connections.length===0){setView("setup")}
   },[user])
 
-  // ── Online/offline events ───────────────────────────────────────────────────
+  // ── Online/offline ───────────────────────────────────────────────────────────
   useEffect(()=>{
     const goOnline=()=>{setOnline(true);setShowBanner(true);setTimeout(()=>setShowBanner(false),5000);processQueue()}
     const goOffline=()=>{setOnline(false);setShowBanner(false)}
@@ -379,52 +1617,38 @@ export default function App() {
     return()=>{window.removeEventListener("online",goOnline);window.removeEventListener("offline",goOffline)}
   },[])
 
+  // ── Auto-sync countdown ──────────────────────────────────────────────────────
+  useEffect(()=>{
+    if(!autoSyncInterval||!configured) return
+    setSyncCountdown(autoSyncInterval*60)
+    const id=setInterval(()=>{
+      setSyncCountdown(prev=>{
+        if(prev<=1){doSync();return autoSyncInterval*60}
+        return prev-1
+      })
+    },1000)
+    return()=>clearInterval(id)
+  },[autoSyncInterval,configured])
+
+  const fmtCountdown=(s)=>{
+    const m=Math.floor(s/60),sec=s%60
+    return `${m}:${String(sec).padStart(2,"0")}`
+  }
+
   const toast=(msg,type="ok")=>{setNotif({msg,type});setTimeout(()=>setNotif(null),5000)}
 
-  // ── Login / Logout ──────────────────────────────────────────────────────────
-  const handleLogin=async(username,password)=>{
-    const data=await authAPI.login(username,password)
-    localStorage.setItem("stockin_token",data.token)
-    setUser(data.user)
-    if(configured){setView("dashboard");doSync(activeConn)}
-    else setView("setup")
-  }
-  const handleLogout=async()=>{
-    try{await authAPI.logout()}catch{}
-    localStorage.removeItem("stockin_token")
-    setUser(null);setView("dashboard")
-    setProducts([]);setStocks([]);setSuppliers([]);setWarehouses([]);setAlbaranes([]);setTraspasos([])
-    setConnected(null)
+  // ── WhatsApp alerts ──────────────────────────────────────────────────────────
+  const sendWhatsappAlerts=async(alertRows)=>{
+    if(!whatsappCfg?.enabled||!whatsappCfg.phone||!whatsappCfg.apikey||!alertRows.length) return
+    const text=`🚨 StockIn — ${alertRows.length} alerta${alertRows.length>1?"s":""} de stock:\n`+
+      alertRows.slice(0,5).map(r=>`• ${r.prod?.Name||r.ProductId}: ${r.Quantity} ud (mín ${r.minStock})`).join("\n")+
+      (alertRows.length>5?`\n…y ${alertRows.length-5} más.`:"")
+    try{
+      await fetch(`https://api.callmebot.com/whatsapp.php?phone=${whatsappCfg.phone}&text=${encodeURIComponent(text)}&apikey=${whatsappCfg.apikey}`)
+    }catch{}
   }
 
-  // ── Offline queue processor ─────────────────────────────────────────────────
-  const processQueue=async()=>{
-    const queue=await getQueue()
-    if(!queue.length||!activeConn) return
-    toast(`Conexión restaurada · procesando ${queue.length} acción${queue.length>1?"es":""}…`)
-    const api=createAPI(activeConn)
-    let ok=0,fail=0
-    for(const item of queue){
-      try{
-        await api.importar(item.payload)
-        await removeFromQueue(item.id)
-        ok++
-      }catch{fail++}
-    }
-    const remaining=await getQueue()
-    setQueueCount(remaining.length)
-    if(ok) toast(`${ok} acción${ok>1?"es":""} sincronizada${ok>1?"s":""}${fail?` · ${fail} con error`:""}`)
-    doSync()
-  }
-
-  const queueAction=async(payload,label)=>{
-    await addToQueue({payload,label})
-    const q=await getQueue()
-    setQueueCount(q.length)
-    toast(`Sin conexión — "${label}" guardada, se enviará al reconectar`,"warn")
-  }
-
-  // ── SYNC ────────────────────────────────────────────────────────────────────
+  // ── Sync ─────────────────────────────────────────────────────────────────────
   const doSync=useCallback(async(conn=activeConn)=>{
     if(!conn?.apiToken||syncing) return
     setSyncing(true);setSyncErr(null)
@@ -434,32 +1658,32 @@ export default function App() {
       const maestros=await api.getMaestros(wpIds)
       const prods=norm(maestros,"Products"),stks=norm(maestros,"Stocks"),sups=norm(maestros,"Suppliers"),whs=norm(maestros,"Warehouses")
       setProducts(prods);setStocks(stks);setSuppliers(sups);setWarehouses(whs)
-      // Cache for offline use
       await cacheData(`maestros_${conn.id}`,{prods,stks,sups,whs})
-      if(conn.mode==="acms"){try{const wpData=await api.getWpSummary();const wps=norm(wpData,"WorkplacesSummary");updateConn(conn.id,{workplaces:wps})}catch{}}
-      try{const albData=await api.getAlbaranes(wpIds);const albs=norm(albData,"IncomingDeliveryNotes").map(a=>({...a,_synced:true}));setAlbaranes(albs);await cacheData(`albaranes_${conn.id}`,albs)}catch{setAlbaranes([])}
-      try{const trData=await api.getTraspasos(wpIds);setTraspasos(norm(trData,"StockTransfers"))}catch{}
+      if(conn.mode==="acms"){try{const d=await api.getWpSummary();const wps=norm(d,"WorkplacesSummary");updateConn(conn.id,{workplaces:wps})}catch{}}
+      try{const d=await api.getAlbaranes(wpIds);const albs=norm(d,"IncomingDeliveryNotes").map(a=>({...a,_synced:true}));setAlbaranes(albs);await cacheData(`albaranes_${conn.id}`,albs)}catch{setAlbaranes([])}
+      try{const d=await api.getTraspasos(wpIds);setTraspasos(norm(d,"StockTransfers"))}catch{}
       setConnected(true)
       const ts=new Date().toLocaleTimeString("es-ES",{hour:"2-digit",minute:"2-digit"})
       setLastSync(ts);setCachedAt(null)
+      // WhatsApp alert check
+      const builtRows=buildStockRows(prods,stks,whs)
+      const newAlerts=builtRows.filter(r=>r.minStock>0&&r.Quantity<=r.minStock)
+      await sendWhatsappAlerts(newAlerts)
       toast(`${prods.length} productos · ${stks.length} stocks cargados`)
     }catch(err){
       setConnected(false);setSyncErr(err.message)
-      // Try loading from IndexedDB cache
       const cached=await getCachedData(`maestros_${conn?.id}`)
       if(cached){
         setProducts(cached.data.prods||[]);setStocks(cached.data.stks||[]);setSuppliers(cached.data.sups||[]);setWarehouses(cached.data.whs||[])
         setCachedAt(cached.cachedAt)
         const albCached=await getCachedData(`albaranes_${conn?.id}`)
         if(albCached) setAlbaranes(albCached.data||[])
-        toast("Cargando datos en caché (sin conexión)","warn")
-      } else {
-        toast("Error de conexión: "+err.message,"err")
-      }
+        toast("Datos en caché (sin conexión)","warn")
+      }else{toast("Error: "+err.message,"err")}
     }finally{setSyncing(false)}
-  },[activeConn,syncing])
+  },[activeConn,syncing,whatsappCfg])
 
-  // ── Connections management ──────────────────────────────────────────────────
+  // ── Connection helpers ────────────────────────────────────────────────────────
   const updateConn=(id,changes)=>{
     setConnections(prev=>{const next=prev.map(c=>c.id===id?{...c,...changes}:c);saveConnections(next);return next})
   }
@@ -491,11 +1715,30 @@ export default function App() {
     setConnected(null);setProducts([]);setStocks([]);doSync(updated)
   }
 
-  // ── Importar helpers ────────────────────────────────────────────────────────
+  // ── Offline queue ─────────────────────────────────────────────────────────────
+  const processQueue=async()=>{
+    const queue=await getQueue()
+    if(!queue.length||!activeConn) return
+    toast(`Reconectado · procesando ${queue.length} acción${queue.length>1?"es":""}…`)
+    const api=createAPI(activeConn)
+    let ok=0,fail=0
+    for(const item of queue){
+      try{await api.importar(item.payload);await removeFromQueue(item.id);ok++}catch{fail++}
+    }
+    const remaining=await getQueue();setQueueCount(remaining.length)
+    if(ok) toast(`${ok} acción${ok>1?"es":""} sincronizada${ok>1?"s":""}${fail?` · ${fail} con error`:""}`)
+    doSync()
+  }
+  const queueAction=async(payload,label)=>{
+    await addToQueue({payload,label});const q=await getQueue();setQueueCount(q.length)
+    toast(`Sin conexión — "${label}" guardada, se enviará al reconectar`,"warn")
+  }
   const withOfflineSupport=async(payload,label,apiFn)=>{
     if(!online){await queueAction(payload,label);return}
     try{await apiFn()}catch(e){toast("Error: "+e.message,"err");throw e}
   }
+
+  // ── Import helpers ────────────────────────────────────────────────────────────
   const importarAlbaran=async(albaran)=>{
     if(!activeConn) return
     await withOfflineSupport({IncomingDeliveryNotes:[albaran]},"Albarán",async()=>{
@@ -507,9 +1750,9 @@ export default function App() {
   }
   const importarTraspaso=async(t)=>{
     if(!activeConn) return
-    await withOfflineSupport({StockAdjustments:[t]},"Traspaso",async()=>{
+    await withOfflineSupport({StockTransfers:[t]},"Traspaso",async()=>{
       const api=createAPI(activeConn)
-      try{await api.importar({StockAdjustments:[t]})}catch{}
+      try{await api.importar({StockTransfers:[t]})}catch{}
       setTraspasos(prev=>[{...t,_local:true,_date:new Date().toISOString()},...prev])
       toast("Traspaso registrado ✓");doSync()
     })
@@ -519,7 +1762,7 @@ export default function App() {
     const api=createAPI(activeConn)
     const ahora=new Date()
     const serie=tipo==="entrada"?"RE":"RM"
-    const Lines=lineas.map(l=>({ProductId:l.ProductId,ProductName:l.productName,OrderedQuantity:tipo==="entrada"?Math.abs(parseFloat(l.cantidad)):-Math.abs(parseFloat(l.cantidad)),DeliveredQuantity:tipo==="entrada"?Math.abs(parseFloat(l.cantidad)):-Math.abs(parseFloat(l.cantidad)),Price:parseFloat(l.costPrice)||0}))
+    const Lines=lineas.map(l=>({ProductId:l.ProductId,ProductName:l.productName,DeliveredQuantity:tipo==="entrada"?Math.abs(parseFloat(l.cantidad)):-Math.abs(parseFloat(l.cantidad)),OrderedQuantity:tipo==="entrada"?Math.abs(parseFloat(l.cantidad)):-Math.abs(parseFloat(l.cantidad)),CostPrice:parseFloat(l.costPrice)||0}))
     const albaran={Serie:serie,Number:ahora.getTime(),Date:ahora.toISOString().slice(0,10),Status:"Pending",Notes:motivo||"Regularización StockIn",Warehouse:{Id:warehouseId},Supplier:{},Lines}
     await withOfflineSupport({IncomingDeliveryNotes:[albaran]},"Regularización",async()=>{
       await api.importar({IncomingDeliveryNotes:[albaran]})
@@ -539,10 +1782,18 @@ export default function App() {
   const importarProducto=async(prod)=>{
     if(!activeConn) return
     const api=createAPI(activeConn)
-    const payload={Products:[{Id:prod.Id,Name:prod.Name,VatId:prod.VatId,FamilyId:prod.FamilyId??null,CostPrice:prod.CostPrice??0,StorageOptions:(prod.StorageOptions||[]).map(so=>({WarehouseId:so.WarehouseId,Location:so.Location||"",MinStock:parseFloat(so.MinStock)||0,MaxStock:parseFloat(so.MaxStock)||0})),CostPrices:(prod.CostPrices||[]).map(cp=>({WarehouseId:cp.WarehouseId,CostPrice:parseFloat(cp.CostPrice)||0}))}]}
+    const payload={Products:[{Id:prod.Id,Name:prod.Name,VatId:prod.VatId,FamilyId:prod.FamilyId??null,CostPrice:parseFloat(prod.CostPrice)||0,StorageOptions:(prod.StorageOptions||[]).map(so=>({WarehouseId:so.WarehouseId,Location:so.Location||"",MinStock:parseFloat(so.MinStock)||0,MaxStock:parseFloat(so.MaxStock)||0})),CostPrices:(prod.CostPrices||[]).map(cp=>({WarehouseId:cp.WarehouseId,CostPrice:parseFloat(cp.CostPrice)||0}))}]}
     await api.importar(payload)
     setProducts(prev=>prev.map(p=>p.Id===prod.Id?{...p,...prod}:p))
     if(activeConn.mode==="acms")try{const a=createAPI(activeConn);await a.acmsHub(activeConn.activeWorkplace?[activeConn.activeWorkplace]:[])}catch{}
+  }
+
+  const handleAutoSyncChange=(val)=>{
+    setAutoSyncInterval(val);localStorage.setItem("stockin_auto_sync",String(val))
+    if(!val) setSyncCountdown(0)
+  }
+  const handleWhatsappSave=(cfg)=>{
+    setWhatsappCfg(cfg);localStorage.setItem("stockin_whatsapp",JSON.stringify(cfg))
   }
 
   const syncColor=!configured?"rgba(255,255,255,0.25)":syncing?T.yellow:connected===false?T.red:connected===true?T.green:"rgba(255,255,255,0.4)"
@@ -550,25 +1801,25 @@ export default function App() {
   const alertas=stockRows.filter(r=>r.minStock>0&&r.Quantity<=r.minStock)
 
   const NAV_ITEMS=[
-    {id:"dashboard",   label:"Dashboard",      icon:"dashboard"},
-    {id:"alertas",     label:"Alertas",        icon:"alert",   badge:alertas.length||null,bc:T.red},
-    {id:"stock",       label:"Stock",          icon:"stock"},
-    {id:"regularizacion",label:"Regularización",icon:"adjust"},
-    {id:"pedidos",     label:"Reposición",     icon:"cart"},
-    {id:"historico",   label:"Historial",      icon:"history"},
-    {id:"albaranes",   label:"Albaranes",      icon:"albaran"},
-    {id:"traspasos",   label:"Traspasos",      icon:"transfer"},
-    {id:"productos",   label:"Productos",      icon:"box"},
-    {id:"proveedores", label:"Proveedores",    icon:"proveedor"},
-    {id:"informe",     label:"Informe mensual",icon:"mail"},
-    {id:"usuarios",    label:"Usuarios",       icon:"users"},
-    {id:"setup",       label:"Configuración",  icon:"settings",badge:!configured?"!":null,bc:T.yellow},
+    {id:"dashboard",     label:"Dashboard",      icon:"dashboard"},
+    {id:"alertas",       label:"Alertas",        icon:"alert",   badge:alertas.length||null,bc:T.red},
+    {id:"stock",         label:"Stock",          icon:"stock"},
+    {id:"regularizacion",label:"Regularización", icon:"adjust"},
+    {id:"pedidos",       label:"Reposición",     icon:"cart"},
+    {id:"historico",     label:"Historial",      icon:"history"},
+    {id:"albaranes",     label:"Albaranes",      icon:"albaran"},
+    {id:"traspasos",     label:"Traspasos",      icon:"transfer"},
+    {id:"productos",     label:"Productos",      icon:"box"},
+    {id:"proveedores",   label:"Proveedores",    icon:"proveedor"},
+    {id:"informe",       label:"Informe mensual",icon:"mail"},
+    {id:"usuarios",      label:"Usuarios",       icon:"users"},
+    {id:"setup",         label:"Configuración",  icon:"settings",badge:!configured?"!":null,bc:T.yellow},
   ].filter(item=>canSeeNav(item.id))
 
   const navigate=(id)=>{setView(id);setSideOpen(false)}
 
   if(authLoading) return <div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100vh",background:"#f0f5f6",fontFamily:"sans-serif",color:"#6b8f95"}}>Cargando…</div>
-  if(!user) return <LoginScreen onLogin={handleLogin}/>
+  if(!user) return <LoginScreen onLogin={async(u,p)=>{const d=await authAPI.login(u,p);localStorage.setItem("stockin_token",d.token);setUser(d.user);if(configured){setView("dashboard");doSync(activeConn)}else setView("setup")}}/>
 
   const ROLE_BADGE_COLOR={admin:T.accent,manager:T.brand,employee:T.green,readonly:T.muted}
   const ROLE_BADGE_LABEL={admin:"Admin",manager:"Encargado",employee:"Empleado",readonly:"Lectura"}
@@ -599,7 +1850,6 @@ export default function App() {
           </button>
         ))}
       </nav>
-      {/* User info + logout */}
       <div style={{padding:"10px 10px 4px",borderTop:"1px solid rgba(255,255,255,0.1)"}}>
         <div style={{display:"flex",alignItems:"center",gap:8,padding:"8px 6px",borderRadius:8,background:"rgba(255,255,255,0.07)",marginBottom:6}}>
           <div style={{width:32,height:32,borderRadius:8,background:ROLE_BADGE_COLOR[role]||T.muted,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:13,fontWeight:700,color:"#fff"}}>{user.fullName?.[0]?.toUpperCase()||"?"}</div>
@@ -607,19 +1857,18 @@ export default function App() {
             <div style={{fontSize:12,fontWeight:600,color:"#fff",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{user.fullName}</div>
             <div style={{fontSize:10,color:"rgba(255,255,255,0.5)"}}>{ROLE_BADGE_LABEL[role]||role}</div>
           </div>
-          <button onClick={handleLogout} title="Cerrar sesión" style={{background:"rgba(255,255,255,0.1)",border:"none",borderRadius:6,color:"rgba(255,255,255,0.6)",cursor:"pointer",padding:"5px",display:"flex"}}>
+          <button onClick={async()=>{try{await authAPI.logout()}catch{}localStorage.removeItem("stockin_token");setUser(null);setView("dashboard");setProducts([]);setStocks([]);setSuppliers([]);setWarehouses([]);setAlbaranes([]);setTraspasos([]);setConnected(null)}} title="Cerrar sesión" style={{background:"rgba(255,255,255,0.1)",border:"none",borderRadius:6,color:"rgba(255,255,255,0.6)",cursor:"pointer",padding:"5px",display:"flex"}}>
             <Ic n="logout" s={14}/>
           </button>
         </div>
-        {/* Sync button */}
-        <button onClick={()=>{if(configured&&!syncing)doSync()}} disabled={!configured||syncing} style={{width:"100%",padding:"8px",borderRadius:8,fontFamily:"inherit",background:connected===true&&!syncing?"rgba(10,158,118,0.15)":connected===false?"rgba(220,53,69,0.15)":"rgba(255,255,255,0.05)",border:`1px solid ${syncColor}`,color:syncColor,cursor:!configured||syncing?"not-allowed":"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6,fontSize:12,fontWeight:600,opacity:!configured?0.4:1,marginBottom:6}}>
+        <button onClick={()=>{if(configured&&!syncing)doSync()}} disabled={!configured||syncing} style={{width:"100%",padding:"8px",borderRadius:8,fontFamily:"inherit",background:connected===true&&!syncing?"rgba(10,158,118,0.15)":connected===false?"rgba(220,53,69,0.15)":"rgba(255,255,255,0.05)",border:`1px solid ${syncColor}`,color:syncColor,cursor:!configured||syncing?"not-allowed":"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6,fontSize:12,fontWeight:600,opacity:!configured?0.4:1,marginBottom:autoSyncInterval>0&&syncCountdown>0?0:6}}>
           <Ic n="sync" s={13} spin={syncing}/>
           {syncing?"Sincronizando…":connected===false?"Reintentar":connected===true?`Sync · ${lastSync}`:"Sincronizar"}
         </button>
-        {/* Offline indicator */}
+        {autoSyncInterval>0&&syncCountdown>0&&<div style={{fontSize:10,color:"rgba(255,255,255,0.4)",textAlign:"center",padding:"3px 0 6px",fontVariantNumeric:"tabular-nums"}}>Próxima sync en {fmtCountdown(syncCountdown)}</div>}
         {!online&&<div style={{fontSize:10,color:T.orange,textAlign:"center",padding:"4px 0",fontWeight:600}}>Sin conexión{queueCount>0?` · ${queueCount} pendiente${queueCount>1?"s":""}`:""}</div>}
         {syncErr&&<div style={{marginTop:2,fontSize:10,color:T.red,textAlign:"center",lineHeight:1.4,wordBreak:"break-word",marginBottom:6}}>{syncErr.slice(0,80)}</div>}
-        {cachedAt&&<div style={{fontSize:10,color:T.yellow,textAlign:"center",lineHeight:1.4,marginBottom:6}}>Datos del {new Date(cachedAt).toLocaleString("es-ES",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})}</div>}
+        {cachedAt&&<div style={{fontSize:10,color:T.yellow,textAlign:"center",lineHeight:1.4,marginBottom:6}}>Caché: {new Date(cachedAt).toLocaleString("es-ES",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})}</div>}
       </div>
     </>
   )
@@ -636,33 +1885,27 @@ export default function App() {
         </div>
       )}
       <main style={{flex:1,overflow:"auto",minWidth:0}}>
-        {/* Mobile topbar */}
         <div className="topbar-mobile" style={{display:"none",alignItems:"center",gap:10,padding:"12px 16px",background:T.brand,position:"sticky",top:0,zIndex:100,borderBottom:"1px solid rgba(255,255,255,0.1)"}}>
           <button onClick={()=>setSideOpen(true)} style={{background:"rgba(255,255,255,0.1)",border:"none",borderRadius:8,color:"#fff",cursor:"pointer",padding:"7px",display:"flex"}}><Ic n="menu" s={18}/></button>
           <div style={{flex:1,fontSize:14,fontWeight:700,color:"#fff"}}><span style={{color:T.accent}}>rekor</span>.es StockIn</div>
-          {/* Offline dot */}
           <div style={{display:"flex",alignItems:"center",gap:5,fontSize:11,fontWeight:600,color:online?T.green:T.orange}}>
             <div style={{width:6,height:6,borderRadius:"50%",background:online?T.green:T.orange,animation:!online?"pulse 1.5s infinite":"none"}}/>
             {!online&&"Offline"}
           </div>
           <button onClick={()=>{if(configured&&!syncing)doSync()}} style={{background:"none",border:"none",cursor:"pointer",color:syncColor,display:"flex",padding:4}}><Ic n="sync" s={18} spin={syncing}/></button>
         </div>
-        {/* Offline banner */}
         {!online&&<div style={{background:"rgba(234,108,0,0.1)",borderBottom:`2px solid ${T.orange}`,padding:"7px 20px",display:"flex",alignItems:"center",justifyContent:"center",gap:10,fontSize:12,fontWeight:600,color:T.orange}}>
-          ⚠ Sin conexión — trabajando con datos en caché. Las acciones se guardarán y enviarán al reconectar.
+          ⚠ Sin conexión — trabajando con datos en caché. Las acciones se sincronizarán al reconectar.
           {queueCount>0&&<span style={{background:T.orange,color:"#fff",borderRadius:12,padding:"2px 8px",fontSize:11}}>{queueCount} pendiente{queueCount>1?"s":""}</span>}
         </div>}
-        {/* Reconnection banner */}
         {showBanner&&<div style={{background:T.green,color:"#fff",padding:"9px 20px",display:"flex",alignItems:"center",justifyContent:"center",gap:8,fontSize:13,fontWeight:600,animation:"slideDown 0.3s ease"}}>
           ✓ Conexión restaurada{queueCount>0?` · sincronizando ${queueCount} acción${queueCount>1?"es":""}…`:""}
         </div>}
         <div style={{padding:"24px 28px"}} className="main-pad">
-          {/* Toast */}
           {notif&&<div style={{position:"fixed",top:16,right:16,zIndex:400,maxWidth:380,background:notif.type==="ok"?"#f0fdf8":notif.type==="warn"?"#fffbeb":"#fff5f5",border:`1px solid ${notif.type==="ok"?T.green:notif.type==="warn"?T.yellow:T.red}`,borderRadius:10,padding:"11px 16px",display:"flex",alignItems:"center",gap:10,color:notif.type==="ok"?T.green:notif.type==="warn"?T.yellow:T.red,fontSize:13,fontWeight:500,boxShadow:"0 4px 20px rgba(3,70,80,0.12)",animation:"slideIn 0.2s ease"}}>
             <Ic n={notif.type==="ok"?"check":"alert"} s={15}/>{notif.msg}
           </div>}
-          {/* VIEWS */}
-          {view==="setup"&&PERMS.canSeeSetup(role)&&<SetupView connections={connections} activeId={activeId} onNew={()=>setModal("new-conn")} onEdit={(c)=>{setEditConn(c);setModal("edit-conn")}} onSwitch={switchConn} onDelete={deleteConn} toast={toast}/>}
+          {view==="setup"&&PERMS.canSeeSetup(role)&&<SetupView connections={connections} activeId={activeId} onNew={()=>setModal("new-conn")} onEdit={(c)=>{setEditConn(c);setModal("edit-conn")}} onSwitch={switchConn} onDelete={deleteConn} toast={toast} autoSyncInterval={autoSyncInterval} onAutoSyncChange={handleAutoSyncChange} whatsappCfg={whatsappCfg} onWhatsappSave={handleWhatsappSave}/>}
           {view==="usuarios"&&PERMS.canManageUsers(role)&&<UsersPanel currentUser={user} toast={toast}/>}
           {view==="informe"&&<MonthlyReport stockRows={stockRows} albaranes={albaranes} alertas={alertas} conn={activeConn} toast={toast}/>}
           {view!=="setup"&&view!=="usuarios"&&view!=="informe"&&!configured&&<NoConnection onSetup={()=>setView("setup")} onNew={()=>setModal("new-conn")}/>}
@@ -672,7 +1915,7 @@ export default function App() {
             {(products.length>0||(connected===true&&!syncing)||cachedAt)&&<>
               {view==="dashboard"&&<Dashboard stockRows={stockRows} alertas={alertas} albaranes={albaranes} traspasos={traspasos} conn={activeConn} onNav={navigate} role={role}/>}
               {view==="alertas"&&<AlertasView stockRows={stockRows} alertas={alertas} warehouses={warehouses} onIrInventario={()=>navigate("regularizacion")} role={role}/>}
-              {view==="stock"&&<StockView stockRows={stockRows} warehouses={warehouses} role={role}/>}
+              {view==="stock"&&<StockView stockRows={stockRows} warehouses={warehouses} role={role} albaranes={albaranes}/>}
               {view==="regularizacion"&&PERMS.canRegularize(role)&&<RegularizacionView stockRows={stockRows} products={products} warehouses={warehouses} conn={activeConn} onGuardar={importarRegularizacion} toast={toast} role={role}/>}
               {view==="pedidos"&&PERMS.canWrite(role)&&<PedidosReposicionView stockRows={stockRows} products={products} warehouses={warehouses} suppliers={suppliers} conn={activeConn} onCrear={importarPedidoReposicion} toast={toast} role={role}/>}
               {view==="historico"&&<HistoricoView albaranes={albaranes} traspasos={traspasos} warehouses={warehouses}/>}
@@ -684,7 +1927,6 @@ export default function App() {
           </>}
         </div>
       </main>
-      {/* Connection modals */}
       {modal==="new-conn"&&<Modal title="Nueva conexión con Ágora" onClose={()=>setModal(null)}><ConnectionForm onSave={saveNewConn} onCancel={()=>setModal(null)} toast={toast}/></Modal>}
       {modal==="edit-conn"&&editConn&&<Modal title="Editar conexión" onClose={()=>{setModal(null);setEditConn(null)}}><ConnectionForm initial={editConn} onSave={saveEditConn} onCancel={()=>{setModal(null);setEditConn(null)}} toast={toast}/></Modal>}
       {modal==="manage-conn"&&<Modal title="Gestionar conexiones" onClose={()=>setModal(null)}>
@@ -696,7 +1938,7 @@ export default function App() {
         *{box-sizing:border-box;margin:0;padding:0}
         ::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-track{background:#f0f5f6}::-webkit-scrollbar-thumb{background:#c5d8db;border-radius:3px}
         button:focus-visible{outline:2px solid #0592A7;outline-offset:2px}
-        input:focus{border-color:#0592A7 !important;box-shadow:0 0 0 3px rgba(5,146,167,0.12) !important}
+        input:focus,select:focus{border-color:#0592A7 !important;box-shadow:0 0 0 3px rgba(5,146,167,0.12) !important;outline:none}
         @keyframes spin{to{transform:rotate(360deg)}}
         @keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
         @keyframes slideIn{from{opacity:0;transform:translateX(14px)}to{opacity:1;transform:none}}

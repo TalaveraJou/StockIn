@@ -13,15 +13,15 @@ export const ROLES = {
 }
 
 export const NAV_ACCESS = {
-  admin:    ['dashboard','alertas','stock','regularizacion','pedidos','historico','albaranes','traspasos','productos','proveedores','setup','usuarios'],
-  manager:  ['dashboard','alertas','stock','regularizacion','pedidos','historico','albaranes','traspasos','productos','proveedores'],
+  admin:    ['dashboard','alertas','stock','regularizacion','pedidos','historico','albaranes','traspasos','productos','proveedores','setup','usuarios','informe'],
+  manager:  ['dashboard','alertas','stock','regularizacion','pedidos','historico','albaranes','traspasos','productos','proveedores','informe'],
   employee: ['dashboard','alertas','stock','regularizacion'],
   readonly: ['dashboard','alertas','stock'],
 }
 
 export const PERMS = {
   // Can see cost prices (CostPrice fields)
-  seeCostPrices:    (role) => role === 'admin',
+  seeCostPrices:    (role) => role === 'admin' || role === 'manager',
   // Can perform write actions (create, import, save)
   canWrite:         (role) => role === 'admin' || role === 'manager',
   // Can do regularizacion
