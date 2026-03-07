@@ -1,0 +1,42 @@
+[
+  {
+    "id": "1",
+    "username": "admin",
+    "passwordHash": "$2a$10$jHvWWOR0os0ENfN4hcetQOo9ikER5poK1Sx6kkq0EkAnqreaAzJVq",
+    "fullName": "Administrador",
+    "role": "admin",
+    "active": true,
+    "createdAt": "2024-01-01T00:00:00.000Z",
+    "lastLogin": null
+  },
+  {
+    "id": "2",
+    "username": "encargado",
+    "passwordHash": "$2a$10$NExuZfINVdSJCuFuPLcu4u2UH49l.gtZQBr8gF4fVnsMMPkHUNLY.",
+    "fullName": "Encargado",
+    "role": "manager",
+    "active": true,
+    "createdAt": "2024-01-01T00:00:00.000Z",
+    "lastLogin": null
+  },
+  {
+    "id": "3",
+    "username": "empleado",
+    "passwordHash": "$2a$10$TAF.ANmFVKemIVyG6UZKiu/DSuNseyQQPEgSOdYuoNls3U2AnykAG",
+    "fullName": "Empleado",
+    "role": "employee",
+    "active": true,
+    "createdAt": "2024-01-01T00:00:00.000Z",
+    "lastLogin": null
+  },
+  {
+    "id": "4",
+    "username": "dueno",
+    "passwordHash": "$2a$10$dslXXrxt1m/6Cg0NGNKegOBdjMd7P9qQiEYgh6TnWJFY.vw3tV1Ti",
+    "fullName": "Due\u00f1o",
+    "role": "readonly",
+    "active": true,
+    "createdAt": "2024-01-01T00:00:00.000Z",
+    "lastLogin": null
+  }
+]

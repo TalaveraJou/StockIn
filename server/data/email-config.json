@@ -1,0 +1,14 @@
+{
+  "recipients": "",
+  "senderName": "StockIn Reports",
+  "smtp": {
+    "host": "smtp.gmail.com",
+    "port": 587,
+    "user": "",
+    "pass": ""
+  },
+  "sendDay": 1,
+  "enabled": false,
+  "lastSent": null,
+  "history": []
+}
