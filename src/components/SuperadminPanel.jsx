@@ -539,15 +539,16 @@ function UserForm({ initial, distributors, locations, onSave, onCancel, saving }
   }, [form.distributorId, locations])
 
   const handleSave = () => {
-    if (!initial?.id && form.password !== confirmPw) { setPwErr('Las contraseñas no coinciden'); return }
-    if (initial?.id && form.password && form.password !== confirmPw) { setPwErr('Las contraseñas no coinciden'); return }
+    if (form.password && form.password !== confirmPw) { setPwErr('Las contraseñas no coinciden'); return }
+    if (isNew && !form.password.trim()) { setPwErr('La contraseña es obligatoria'); return }
     setPwErr('')
     onSave(form)
   }
 
-  const isNew = !initial?.id
-  const pwRequired = isNew && !form.password
-  const canSave = form.username.trim() && form.fullName.trim() && !pwRequired && !pwErr
+  const isNew       = !initial?.id
+  const pwMismatch  = form.password && confirmPw && form.password !== confirmPw
+  const pwRequired  = isNew && !form.password.trim()
+  const canSave     = form.username.trim() && form.fullName.trim() && !pwRequired && !pwMismatch
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -658,13 +659,19 @@ function UsuariosModule({ toast }) {
 
   const load = useCallback(async () => {
     setLoading(true)
+    // Fetch users first — critical path; a failure here shows an error
     try {
-      const [uRes, dRes, lRes] = await Promise.all([saAPI.getSaUsers(), saAPI.getDistributors(), saAPI.getLocations()])
+      const uRes = await saAPI.getSaUsers()
       setItems(Array.isArray(uRes) ? uRes : [])
-      setDistributors(Array.isArray(dRes) ? dRes : [])
-      setLocations(Array.isArray(lRes) ? lRes : [])
-    } catch (e) { toast(e.message, 'err') }
+    } catch (e) {
+      toast('Error al cargar usuarios: ' + e.message, 'err')
+      setLoading(false)
+      return
+    }
     setLoading(false)
+    // Distributors and locations load independently — don't block the user list
+    saAPI.getDistributors().then(r => { if (Array.isArray(r)) setDistributors(r) }).catch(() => {})
+    saAPI.getLocations().then(r => { if (Array.isArray(r)) setLocations(r) }).catch(() => {})
   }, [])
 
   useEffect(() => { load() }, [load])

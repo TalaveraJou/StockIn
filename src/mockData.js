@@ -18,10 +18,9 @@ export const DEMO_CREDENTIALS = {
 }
 
 export const DEMO_USER_LIST = [
-  { username: 'admin@tpvrent.es',     fullName: 'María Gómez',  roleLabel: 'Admin' },
+  { username: 'admin@tpvrent.es',     fullName: 'María Gómez',   roleLabel: 'Admin' },
   { username: 'encargado@tpvrent.es', fullName: 'Carlos Martín', roleLabel: 'Encargado' },
-  { username: 'camarero@tpvrent.es',  fullName: 'Ana López',    roleLabel: 'Camarero' },
-  { username: 'superadmin',           fullName: 'Álvaro',        roleLabel: 'SuperAdmin' },
+  { username: 'camarero@tpvrent.es',  fullName: 'Ana López',     roleLabel: 'Camarero' },
 ]
 
 export const isDemoUser = (username) =>

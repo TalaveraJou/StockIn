@@ -559,14 +559,20 @@ app.get('/api/sa/users', authMiddleware, superadminOnly, (req, res) => {
 })
 
 app.post('/api/sa/users', authMiddleware, superadminOnly, async (req, res) => {
-  const { username, password, fullName, role, distributorId, locationId } = req.body
-  if (!username || !password || !fullName || !role) return res.status(400).json({ error: 'Todos los campos obligatorios son requeridos' })
+  const { username, password, fullName, role, active, distributorId, locationId } = req.body
+  if (!username || !password || !fullName || !role)
+    return res.status(400).json({ error: 'Nombre, email, contraseña y rol son obligatorios' })
   const users = readJSON('users.json')
-  if (users.find(u => u.username === username)) return res.status(409).json({ error: 'El email / usuario ya existe' })
+  if (users.find(u => u.username === username))
+    return res.status(409).json({ error: 'El email / usuario ya existe' })
   const newUser = {
-    id: `user_${Date.now()}`, username, passwordHash: await bcrypt.hash(password, 10),
-    fullName, role, distributorId: distributorId||null, locationId: locationId||null,
-    active: true, createdAt: new Date().toISOString(), lastLogin: null,
+    id: `user_${Date.now()}`, username,
+    passwordHash: await bcrypt.hash(password, 10),
+    fullName, role,
+    distributorId: distributorId || null,
+    locationId:    locationId    || null,
+    active:        active !== false,   // respects form toggle; defaults to true
+    createdAt: new Date().toISOString(), lastLogin: null,
   }
   users.push(newUser)
   writeJSON('users.json', users)
