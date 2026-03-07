@@ -38,7 +38,7 @@ export const PERMS = {
 const API_BASE = '/api'
 
 const apiFetch = (path, opts = {}) => {
-  const token = localStorage.getItem('stockin_token')
+  const token = sessionStorage.getItem('stockin_token')
   return fetch(`${API_BASE}${path}`, {
     ...opts,
     headers: {

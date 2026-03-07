@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react"
+import { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import LoginScreen from "./components/LoginScreen.jsx"
 import UsersPanel from "./components/UsersPanel.jsx"
 import MonthlyReport from "./components/MonthlyReport.jsx"
@@ -14,6 +14,10 @@ const loadConnections = () => { try { return JSON.parse(localStorage.getItem(STO
 const saveConnections = (l) => { try { localStorage.setItem(STORE_KEY, JSON.stringify(l)) } catch {} }
 const loadActiveId = () => { try { return localStorage.getItem(ACTIVE_KEY) || null } catch { return null } }
 const saveActiveId = (id) => { try { localStorage.setItem(ACTIVE_KEY, id || "") } catch {} }
+const REFS_KEY = "stockin_supp_refs"
+const loadSupplierRefs = () => { try { return JSON.parse(localStorage.getItem(REFS_KEY)) || {} } catch { return {} } }
+const saveSupplierRefsLS = (refs) => { try { localStorage.setItem(REFS_KEY, JSON.stringify(refs)) } catch {} }
+
 const emptyConn = () => ({
   id: `conn_${Date.now()}_${Math.random().toString(36).slice(2,6)}`,
   name:"", mode:"mono", agoraUrl:"", proxyUrl:"", apiToken:"",
@@ -214,9 +218,12 @@ function ConnectionForm({initial,onSave,onCancel,toast}) {
   const [showToken,setShowToken]=useState(false)
   const inIframe=(()=>{try{return window.self!==window.top}catch{return true}})()
   const isCorsError=(msg="")=>msg.toLowerCase().includes("cors")||msg.toLowerCase().includes("failed to fetch")||msg.toLowerCase().includes("network")
+  const validateUrl=(url)=>{if(!url)return true;return /^https?:\/\//i.test(url.trim())}
   const test=async()=>{
     if(!f.apiToken.trim()) return toast("Introduce el API Token primero","err")
     if(!inIframe&&!f.agoraUrl.trim()&&!f.proxyUrl.trim()) return toast("Introduce la URL de Ágora","err")
+    if(!validateUrl(f.agoraUrl)) return toast("La URL de Ágora debe comenzar con http:// o https://","err")
+    if(!validateUrl(f.proxyUrl)) return toast("La URL del proxy debe comenzar con http:// o https://","err")
     setTesting(true);setTestResult(null)
     try {
       const api=createAPI(f); await api.test()
@@ -226,7 +233,7 @@ function ConnectionForm({initial,onSave,onCancel,toast}) {
     } catch(e){const cors=isCorsError(e.message);setTestResult({ok:false,cors,msg:e.message});toast("Error: "+e.message.slice(0,60),"err")}
     finally{setTesting(false)}
   }
-  const canSave=f.apiToken.trim()&&(inIframe||f.agoraUrl.trim()||f.proxyUrl.trim())
+  const canSave=f.apiToken.trim()&&(inIframe||f.agoraUrl.trim()||f.proxyUrl.trim())&&validateUrl(f.agoraUrl)&&validateUrl(f.proxyUrl)
   return <div style={{display:"flex",flexDirection:"column",gap:16}}>
     <Field label="Nombre de la conexión"><input value={f.name} onChange={e=>setF(p=>({...p,name:e.target.value}))} placeholder="Ej: Restaurante Centro" style={S.inp}/></Field>
     <Field label="Tipo de instalación">
@@ -248,8 +255,9 @@ function ConnectionForm({initial,onSave,onCancel,toast}) {
             <button onClick={()=>setShowToken(s=>!s)} style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:T.muted,fontSize:11,fontFamily:"inherit"}}>{showToken?"ocultar":"ver"}</button>
           </div>
         </Field>
-        <Field label="URL del servidor Ágora" hint="IP o DNS del servidor Ágora. Puerto por defecto: 8984.">
-          <input value={f.agoraUrl} onChange={e=>{setF(p=>({...p,agoraUrl:e.target.value}));setTestResult(null)}} placeholder="http://192.168.1.10:8984" style={S.inp}/>
+        <Field label="URL del servidor Ágora" hint="Debe comenzar con http:// o https://. Puerto por defecto: 8984.">
+          <input value={f.agoraUrl} onChange={e=>{setF(p=>({...p,agoraUrl:e.target.value}));setTestResult(null)}} placeholder="http://192.168.1.10:8984" style={{...S.inp,...(f.agoraUrl&&!validateUrl(f.agoraUrl)?{borderColor:"#dc3545"}:{})}}/>
+          {f.agoraUrl&&!validateUrl(f.agoraUrl)&&<div style={{fontSize:11,color:"#dc3545",marginTop:3}}>La URL debe comenzar con http:// o https://</div>}
         </Field>
         {!inIframe&&!f.useClaudeProxy&&(
           <Field label="URL Proxy CORS (opcional)">
@@ -732,9 +740,27 @@ function BarcodeScanner({onScan,onClose}) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+//  BARCODE MATCH SELECTOR
+// ═══════════════════════════════════════════════════════════════════════════════
+function BarcodeMatchSelector({matches,onSelect,onClose}) {
+  return <Modal title="Múltiples coincidencias" onClose={onClose} maxW={420}>
+    <p style={{fontSize:13,color:T.muted,marginBottom:14}}>El código escaneado coincide con varios proveedores. Selecciona el correcto:</p>
+    {matches.map((m,i)=>(
+      <button key={i} onClick={()=>onSelect(m)} style={{display:"flex",alignItems:"center",gap:12,width:"100%",padding:"12px 14px",border:`1px solid ${T.border}`,borderRadius:9,cursor:"pointer",background:"#fff",fontFamily:"inherit",marginBottom:8,textAlign:"left"}}>
+        <div style={{flex:1}}>
+          <div style={{fontSize:13,fontWeight:700,color:T.text}}>{m.productName}</div>
+          <div style={{fontSize:11,color:T.muted}}>Proveedor: {m.supplierName} · Ref: {m.supplierRef||"—"}</div>
+        </div>
+        <Ic n="chevron" s={14} style={{color:T.muted}}/>
+      </button>
+    ))}
+  </Modal>
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 //  REGULARIZACIÓN VIEW  (3 pasos)
 // ═══════════════════════════════════════════════════════════════════════════════
-function RegularizacionView({stockRows,products,warehouses,conn,onGuardar,toast,role}) {
+function RegularizacionView({stockRows,products,warehouses,conn,onGuardar,toast,role,supplierRefs,suppliers}) {
   const [step,setStep]=useState(1)
   const [whId,setWhId]=useState("")
   const [search,setSearch]=useState("")
@@ -743,6 +769,7 @@ function RegularizacionView({stockRows,products,warehouses,conn,onGuardar,toast,
   const [tipo,setTipo]=useState("entrada")
   const [sending,setSending]=useState(false)
   const [showScanner,setShowScanner]=useState(false)
+  const [barcodeMatches,setBarcodeMatches]=useState(null)
   const seePrices=PERMS.seeCostPrices(role)
 
   const whRows=stockRows.filter(r=>!whId||String(r.WarehouseId)===whId)
@@ -758,11 +785,23 @@ function RegularizacionView({stockRows,products,warehouses,conn,onGuardar,toast,
   const updateLine=(pid,field,val)=>setSelected(prev=>prev.map(s=>s.ProductId===pid?{...s,[field]:val}:s))
 
   const handleScan=(barcode)=>{
+    const refMatches=[]
+    Object.entries(supplierRefs||{}).forEach(([pid,refs])=>{
+      ;(refs||[]).forEach(ref=>{
+        if(ref.barcode&&ref.barcode===barcode){
+          const row=stockRows.find(r=>r.ProductId===parseInt(pid))
+          if(row){const sup=suppliers?.find(s=>s.Id===ref.supplierId);refMatches.push({ProductId:parseInt(pid),productName:row.prod?.Name||pid,supplierName:sup?.Name||"Proveedor desconocido",supplierRef:ref.supplierRef||"",row})}
+        }
+      })
+    })
+    if(refMatches.length===1){const m=refMatches[0];if(!isSelected(m.ProductId))toggleProduct(m.row);toast("Producto encontrado: "+m.productName+" ("+m.supplierName+")");return}
+    if(refMatches.length>1){setBarcodeMatches(refMatches);return}
     const row=stockRows.find(r=>r.prod?.Barcode===barcode||r.prod?.Reference===barcode)
     if(!row){toast("Código no encontrado: "+barcode,"err");return}
     if(!isSelected(row.ProductId)) toggleProduct(row)
     toast("Producto encontrado: "+row.prod?.Name)
   }
+  const handleBarcodeSelect=(m)=>{if(!isSelected(m.ProductId))toggleProduct(m.row);toast("Producto: "+m.productName+" ("+m.supplierName+")");setBarcodeMatches(null)}
 
   const confirmar=async()=>{
     const lineas=selected.filter(s=>parseFloat(s.cantidad)!==0&&parseFloat(s.cantidad)!==s.currentQty)
@@ -915,6 +954,7 @@ function RegularizacionView({stockRows,products,warehouses,conn,onGuardar,toast,
       </div>}
 
       {showScanner&&<BarcodeScanner onScan={handleScan} onClose={()=>setShowScanner(false)}/>}
+      {barcodeMatches&&<BarcodeMatchSelector matches={barcodeMatches} onSelect={handleBarcodeSelect} onClose={()=>setBarcodeMatches(null)}/>}
     </div>
   )
 }
@@ -1120,7 +1160,7 @@ function HistoricoView({albaranes,traspasos,warehouses}) {
 // ═══════════════════════════════════════════════════════════════════════════════
 //  ALBARANES VIEW
 // ═══════════════════════════════════════════════════════════════════════════════
-function AlbaranForm({products,suppliers,warehouses,onSave,onCancel,toast}) {
+function AlbaranForm({products,suppliers,warehouses,onSave,onCancel,toast,supplierRefs}) {
   const [suppId,setSuppId]=useState("")
   const [whId,setWhId]=useState("")
   const [date,setDate]=useState(today())
@@ -1129,6 +1169,7 @@ function AlbaranForm({products,suppliers,warehouses,onSave,onCancel,toast}) {
   const [search,setSearch]=useState("")
   const [showScanner,setShowScanner]=useState(false)
   const [sending,setSending]=useState(false)
+  const [barcodeMatches,setBarcodeMatches]=useState(null)
 
   const searchResults=products.filter(p=>search&&(p.Name||"").toLowerCase().includes(search.toLowerCase())).slice(0,6)
 
@@ -1140,11 +1181,23 @@ function AlbaranForm({products,suppliers,warehouses,onSave,onCancel,toast}) {
   }
 
   const handleScan=(barcode)=>{
+    const refMatches=[]
+    Object.entries(supplierRefs||{}).forEach(([pid,refs])=>{
+      ;(refs||[]).forEach(r=>{
+        if(r.barcode&&r.barcode===barcode){
+          const prod=products.find(p=>p.Id===parseInt(pid))
+          if(prod){const sup=suppliers?.find(s=>s.Id===r.supplierId);refMatches.push({prod,supplierName:sup?.Name||"Proveedor desconocido",supplierRef:r.supplierRef||"",productName:prod.Name})}
+        }
+      })
+    })
+    if(refMatches.length===1){addProduct(refMatches[0].prod);toast("Producto añadido: "+refMatches[0].prod.Name+" ("+refMatches[0].supplierName+")");return}
+    if(refMatches.length>1){setBarcodeMatches(refMatches.map(m=>({...m,ProductId:m.prod.Id})));return}
     const prod=products.find(p=>p.Barcode===barcode||p.Reference===barcode)
     if(!prod){toast("Código no encontrado: "+barcode,"err");return}
     addProduct(prod)
     toast("Producto añadido: "+prod.Name)
   }
+  const handleBarcodeAlbSelect=(m)=>{addProduct(m.prod);toast("Producto: "+m.productName+" ("+m.supplierName+")");setBarcodeMatches(null)}
 
   const updateLine=(pid,field,val)=>setLines(prev=>prev.map(l=>l.ProductId===pid?{...l,[field]:val}:l))
   const removeLine=(pid)=>setLines(prev=>prev.filter(l=>l.ProductId!==pid))
@@ -1227,11 +1280,12 @@ function AlbaranForm({products,suppliers,warehouses,onSave,onCancel,toast}) {
         <Btn variant="primary" disabled={sending||!lines.length} onClick={save}><Ic n={sending?"sync":"check"} s={13} spin={sending}/>{sending?"Enviando…":"Guardar albarán"}</Btn>
       </div>
       {showScanner&&<BarcodeScanner onScan={handleScan} onClose={()=>setShowScanner(false)}/>}
+      {barcodeMatches&&<BarcodeMatchSelector matches={barcodeMatches} onSelect={handleBarcodeAlbSelect} onClose={()=>setBarcodeMatches(null)}/>}
     </div>
   )
 }
 
-function AlbaranesView({albaranes,products,suppliers,warehouses,conn,onImportar,toast,role}) {
+function AlbaranesView({albaranes,products,suppliers,warehouses,conn,onImportar,toast,role,supplierRefs}) {
   const [showForm,setShowForm]=useState(false)
   const [search,setSearch]=useState("")
   const fmtDate=(d)=>{if(!d)return"—";try{return new Date(d).toLocaleDateString("es-ES",{day:"2-digit",month:"2-digit",year:"numeric"})}catch{return d}}
@@ -1250,7 +1304,7 @@ function AlbaranesView({albaranes,products,suppliers,warehouses,conn,onImportar,
         <h1 style={{fontSize:20,fontWeight:800,color:T.brand,margin:0}}>Nuevo albarán</h1>
       </div>
       <div style={S.card}>
-        <AlbaranForm products={products} suppliers={suppliers} warehouses={warehouses} onSave={handleSave} onCancel={()=>setShowForm(false)} toast={toast}/>
+        <AlbaranForm products={products} suppliers={suppliers} warehouses={warehouses} onSave={handleSave} onCancel={()=>setShowForm(false)} toast={toast} supplierRefs={supplierRefs}/>
       </div>
     </div>
   )
@@ -1392,10 +1446,11 @@ function TraspasosView({traspasos,products,warehouses,conn,onImportar,toast,stoc
 // ═══════════════════════════════════════════════════════════════════════════════
 //  PRODUCTOS VIEW
 // ═══════════════════════════════════════════════════════════════════════════════
-function ProductosView({products,warehouses,suppliers,conn,onSave,toast,role}) {
+function ProductosView({products,warehouses,suppliers,conn,onSave,toast,role,supplierRefs,onSaveSupplierRefs}) {
   const [search,setSearch]=useState("")
   const [editing,setEditing]=useState(null) // product object being edited
   const [saving,setSaving]=useState(false)
+  const [localRefs,setLocalRefs]=useState([]) // supplier refs for the product being edited
   const seePrices=PERMS.seeCostPrices(role)
 
   const filtered=products.filter(p=>!search||(p.Name||"").toLowerCase().includes(search.toLowerCase())||(p.Reference||"").toLowerCase().includes(search.toLowerCase()))
@@ -1412,8 +1467,13 @@ function ProductosView({products,warehouses,suppliers,conn,onSave,toast,role}) {
       if(seePrices&&!p.CostPrices.find(cp=>cp.WarehouseId===w.Id))
         p.CostPrices.push({WarehouseId:w.Id,CostPrice:prod.CostPrice||0})
     })
+    setLocalRefs((supplierRefs||{})[prod.Id]||[])
     setEditing(p)
   }
+  const addRef=()=>setLocalRefs(prev=>[...prev,{id:`ref_${Date.now()}`,supplierId:"",supplierRef:"",barcode:"",isDefault:false}])
+  const removeRef=(id)=>setLocalRefs(prev=>prev.filter(r=>r.id!==id))
+  const updateRef=(id,field,val)=>setLocalRefs(prev=>prev.map(r=>r.id===id?{...r,[field]:val}:r))
+  const toggleDefaultRef=(id)=>setLocalRefs(prev=>prev.map(r=>({...r,isDefault:r.id===id})))
 
   const updateSO=(whId,field,val)=>setEditing(prev=>({...prev,StorageOptions:prev.StorageOptions.map(so=>so.WarehouseId===whId?{...so,[field]:val}:so)}))
   const updateCP=(whId,val)=>setEditing(prev=>({...prev,CostPrices:prev.CostPrices.map(cp=>cp.WarehouseId===whId?{...cp,CostPrice:val}:cp)}))
@@ -1422,6 +1482,7 @@ function ProductosView({products,warehouses,suppliers,conn,onSave,toast,role}) {
     setSaving(true)
     try{
       await onSave(editing)
+      if(onSaveSupplierRefs) onSaveSupplierRefs(editing.Id,localRefs)
       toast("Producto actualizado ✓")
       setEditing(null)
     }catch(e){toast("Error: "+e.message,"err")}
@@ -1455,6 +1516,43 @@ function ProductosView({products,warehouses,suppliers,conn,onSave,toast,role}) {
               </div>
             </div>
           })}
+        </div>
+
+        <div style={{marginTop:24}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
+            <div style={{fontSize:12,fontWeight:700,color:T.brand,textTransform:"uppercase",letterSpacing:"0.06em"}}>Referencias de proveedor</div>
+            <Btn small variant="secondary" onClick={addRef}><Ic n="plus" s={12}/>Añadir referencia</Btn>
+          </div>
+          {localRefs.length===0
+            ?<div style={{padding:"14px 0",color:T.muted,fontSize:12,textAlign:"center"}}>Sin referencias de proveedor. Añade una para que el escáner detecte este producto por código de barras del proveedor.</div>
+            :<div style={{overflowX:"auto"}}>
+              <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
+                <thead><tr>
+                  <th style={thSt}>Proveedor</th>
+                  <th style={thSt}>Ref. proveedor</th>
+                  <th style={thSt}>Código de barras</th>
+                  <th style={thSt}>Predeterminado</th>
+                  <th style={thSt}></th>
+                </tr></thead>
+                <tbody>
+                {localRefs.map(r=>(
+                  <tr key={r.id} style={{borderBottom:`1px solid ${T.border}`}}>
+                    <td style={{padding:"8px 10px"}}>
+                      <select value={r.supplierId||""} onChange={e=>updateRef(r.id,"supplierId",e.target.value?parseInt(e.target.value):"")} style={{...S.inp,fontSize:12,padding:"6px 8px"}}>
+                        <option value="">Sin proveedor</option>
+                        {suppliers.map(s=><option key={s.Id} value={s.Id}>{s.Name}</option>)}
+                      </select>
+                    </td>
+                    <td style={{padding:"8px 10px"}}><input value={r.supplierRef||""} onChange={e=>updateRef(r.id,"supplierRef",e.target.value)} style={{...S.inp,fontSize:12,padding:"6px 8px"}} placeholder="REF-001"/></td>
+                    <td style={{padding:"8px 10px"}}><input value={r.barcode||""} onChange={e=>updateRef(r.id,"barcode",e.target.value)} style={{...S.inp,fontSize:12,padding:"6px 8px",fontFamily:"monospace"}} placeholder="8412345678901"/></td>
+                    <td style={{padding:"8px 10px",textAlign:"center"}}><input type="checkbox" checked={r.isDefault||false} onChange={()=>toggleDefaultRef(r.id)} style={{accentColor:T.accent,width:16,height:16}}/></td>
+                    <td style={{padding:"8px 10px"}}><Btn small variant="danger" onClick={()=>removeRef(r.id)}><Ic n="trash" s={12}/></Btn></td>
+                  </tr>
+                ))}
+                </tbody>
+              </table>
+            </div>
+          }
         </div>
       </div>
     </div>
@@ -1584,6 +1682,9 @@ export default function App() {
   const [autoSyncInterval,setAutoSyncInterval]=useState(()=>parseInt(localStorage.getItem("stockin_auto_sync")||"0"))
   const [syncCountdown,   setSyncCountdown]   =useState(0)
 
+  // ── Supplier refs ─────────────────────────────────────────────────────────────
+  const [supplierRefs,setSupplierRefs]=useState(loadSupplierRefs)
+
   // ── WhatsApp ─────────────────────────────────────────────────────────────────
   const [whatsappCfg,setWhatsappCfg]=useState(()=>{
     try{return JSON.parse(localStorage.getItem("stockin_whatsapp")||"{}")}catch{return{}}
@@ -1596,9 +1697,9 @@ export default function App() {
 
   // ── Auth check on mount ──────────────────────────────────────────────────────
   useEffect(()=>{
-    const token=localStorage.getItem("stockin_token")
+    const token=sessionStorage.getItem("stockin_token")
     if(!token){setAuthLoading(false);return}
-    authAPI.me().then(u=>{setUser(u);setAuthLoading(false)}).catch(()=>{localStorage.removeItem("stockin_token");setAuthLoading(false)})
+    authAPI.me().then(u=>{setUser(u);setAuthLoading(false)}).catch(()=>{sessionStorage.removeItem("stockin_token");setAuthLoading(false)})
   },[])
 
   useEffect(()=>{
@@ -1616,6 +1717,25 @@ export default function App() {
     getQueue().then(q=>setQueueCount(q.length))
     return()=>{window.removeEventListener("online",goOnline);window.removeEventListener("offline",goOffline)}
   },[])
+
+  // ── Session timeout (8h inactivity) ──────────────────────────────────────────
+  const lastActivityRef=useRef(Date.now())
+  useEffect(()=>{
+    if(!user) return
+    const update=()=>{lastActivityRef.current=Date.now()}
+    const events=["mousedown","keydown","scroll","touchstart"]
+    events.forEach(e=>window.addEventListener(e,update,{passive:true}))
+    const tid=setInterval(()=>{
+      if(Date.now()-lastActivityRef.current>=8*60*60*1000){
+        authAPI.logout().catch(()=>{})
+        sessionStorage.removeItem("stockin_token")
+        setUser(null);setView("dashboard")
+        setProducts([]);setStocks([]);setSuppliers([]);setWarehouses([]);setAlbaranes([]);setTraspasos([]);setConnected(null)
+        setNotif({msg:"Sesión cerrada por inactividad (8 h). Vuelve a iniciar sesión.",type:"warn"})
+      }
+    },60000)
+    return()=>{events.forEach(e=>window.removeEventListener(e,update));clearInterval(tid)}
+  },[user])
 
   // ── Auto-sync countdown ──────────────────────────────────────────────────────
   useEffect(()=>{
@@ -1788,6 +1908,10 @@ export default function App() {
     if(activeConn.mode==="acms")try{const a=createAPI(activeConn);await a.acmsHub(activeConn.activeWorkplace?[activeConn.activeWorkplace]:[])}catch{}
   }
 
+  const handleSaveSupplierRefs=(productId,refs)=>{
+    setSupplierRefs(prev=>{const next={...prev,[productId]:refs};saveSupplierRefsLS(next);return next})
+  }
+
   const handleAutoSyncChange=(val)=>{
     setAutoSyncInterval(val);localStorage.setItem("stockin_auto_sync",String(val))
     if(!val) setSyncCountdown(0)
@@ -1819,7 +1943,7 @@ export default function App() {
   const navigate=(id)=>{setView(id);setSideOpen(false)}
 
   if(authLoading) return <div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100vh",background:"#f0f5f6",fontFamily:"sans-serif",color:"#6b8f95"}}>Cargando…</div>
-  if(!user) return <LoginScreen onLogin={async(u,p)=>{const d=await authAPI.login(u,p);localStorage.setItem("stockin_token",d.token);setUser(d.user);if(configured){setView("dashboard");doSync(activeConn)}else setView("setup")}}/>
+  if(!user) return <LoginScreen onLogin={async(u,p)=>{const d=await authAPI.login(u,p);sessionStorage.setItem("stockin_token",d.token);setUser(d.user);if(configured){setView("dashboard");doSync(activeConn)}else setView("setup")}}/>
 
   const ROLE_BADGE_COLOR={admin:T.accent,manager:T.brand,employee:T.green,readonly:T.muted}
   const ROLE_BADGE_LABEL={admin:"Admin",manager:"Encargado",employee:"Empleado",readonly:"Lectura"}
@@ -1857,7 +1981,7 @@ export default function App() {
             <div style={{fontSize:12,fontWeight:600,color:"#fff",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{user.fullName}</div>
             <div style={{fontSize:10,color:"rgba(255,255,255,0.5)"}}>{ROLE_BADGE_LABEL[role]||role}</div>
           </div>
-          <button onClick={async()=>{try{await authAPI.logout()}catch{}localStorage.removeItem("stockin_token");setUser(null);setView("dashboard");setProducts([]);setStocks([]);setSuppliers([]);setWarehouses([]);setAlbaranes([]);setTraspasos([]);setConnected(null)}} title="Cerrar sesión" style={{background:"rgba(255,255,255,0.1)",border:"none",borderRadius:6,color:"rgba(255,255,255,0.6)",cursor:"pointer",padding:"5px",display:"flex"}}>
+          <button onClick={async()=>{try{await authAPI.logout()}catch{}sessionStorage.removeItem("stockin_token");setUser(null);setView("dashboard");setProducts([]);setStocks([]);setSuppliers([]);setWarehouses([]);setAlbaranes([]);setTraspasos([]);setConnected(null)}} title="Cerrar sesión" style={{background:"rgba(255,255,255,0.1)",border:"none",borderRadius:6,color:"rgba(255,255,255,0.6)",cursor:"pointer",padding:"5px",display:"flex"}}>
             <Ic n="logout" s={14}/>
           </button>
         </div>
@@ -1916,12 +2040,12 @@ export default function App() {
               {view==="dashboard"&&<Dashboard stockRows={stockRows} alertas={alertas} albaranes={albaranes} traspasos={traspasos} conn={activeConn} onNav={navigate} role={role}/>}
               {view==="alertas"&&<AlertasView stockRows={stockRows} alertas={alertas} warehouses={warehouses} onIrInventario={()=>navigate("regularizacion")} role={role}/>}
               {view==="stock"&&<StockView stockRows={stockRows} warehouses={warehouses} role={role} albaranes={albaranes}/>}
-              {view==="regularizacion"&&PERMS.canRegularize(role)&&<RegularizacionView stockRows={stockRows} products={products} warehouses={warehouses} conn={activeConn} onGuardar={importarRegularizacion} toast={toast} role={role}/>}
+              {view==="regularizacion"&&PERMS.canRegularize(role)&&<RegularizacionView stockRows={stockRows} products={products} warehouses={warehouses} conn={activeConn} onGuardar={importarRegularizacion} toast={toast} role={role} supplierRefs={supplierRefs} suppliers={suppliers}/>}
               {view==="pedidos"&&PERMS.canWrite(role)&&<PedidosReposicionView stockRows={stockRows} products={products} warehouses={warehouses} suppliers={suppliers} conn={activeConn} onCrear={importarPedidoReposicion} toast={toast} role={role}/>}
               {view==="historico"&&<HistoricoView albaranes={albaranes} traspasos={traspasos} warehouses={warehouses}/>}
-              {view==="albaranes"&&PERMS.canWrite(role)&&<AlbaranesView albaranes={albaranes} products={products} suppliers={suppliers} warehouses={warehouses} conn={activeConn} onImportar={importarAlbaran} toast={toast} role={role}/>}
+              {view==="albaranes"&&PERMS.canWrite(role)&&<AlbaranesView albaranes={albaranes} products={products} suppliers={suppliers} warehouses={warehouses} conn={activeConn} onImportar={importarAlbaran} toast={toast} role={role} supplierRefs={supplierRefs}/>}
               {view==="traspasos"&&PERMS.canWrite(role)&&<TraspasosView traspasos={traspasos} products={products} warehouses={warehouses} conn={activeConn} onImportar={importarTraspaso} toast={toast} stockRows={stockRows}/>}
-              {view==="productos"&&PERMS.canWrite(role)&&<ProductosView products={products} warehouses={warehouses} suppliers={suppliers} conn={activeConn} onSave={importarProducto} toast={toast} role={role}/>}
+              {view==="productos"&&PERMS.canWrite(role)&&<ProductosView products={products} warehouses={warehouses} suppliers={suppliers} conn={activeConn} onSave={importarProducto} toast={toast} role={role} supplierRefs={supplierRefs} onSaveSupplierRefs={handleSaveSupplierRefs}/>}
               {view==="proveedores"&&<ProveedoresView suppliers={suppliers} albaranes={albaranes}/>}
             </>}
           </>}
