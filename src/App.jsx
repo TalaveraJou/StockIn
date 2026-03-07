@@ -6,6 +6,7 @@ import SuperadminPanel from "./components/SuperadminPanel.jsx"
 import SuspendedScreen from "./components/SuspendedScreen.jsx"
 import { authAPI, NAV_ACCESS, PERMS } from "./auth.js"
 import { addToQueue, getQueue, removeFromQueue, cacheData, getCachedData } from "./offline.js"
+import { isDemoUser, getMockMaestros, getMockAlbaranes, getMockTraspasos } from "./mockData.js"
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  STORAGE
@@ -171,6 +172,74 @@ function Empty({msg,icon="search"}) {
 }
 function Field({label,children,hint}) {
   return <div><label style={S.label}>{label}</label>{children}{hint&&<div style={{fontSize:11,color:T.muted,marginTop:4,lineHeight:1.5}}>{hint}</div>}</div>
+}
+
+// ── ACCOUNT SETTINGS MODAL ───────────────────────────────────────────────────
+function AccountSettingsModal({user,role,onClose,toast,onUpdateUser}) {
+  const [form,setForm]=useState({fullName:user.fullName||"",email:user.username||"",phone:user.phone||""})
+  const [pw,setPw]=useState({current:"",next:"",confirm:""})
+  const [showPw,setShowPw]=useState(false)
+  const [changelogSub,setChangelogSub]=useState(user.changelogSub??true)
+  const [saving,setSaving]=useState(false)
+  const ROLE_LABELS={superadmin:"Super Admin",admin:"Admin",encargado:"Encargado",camarero:"Camarero",manager:"Encargado",employee:"Camarero",readonly:"Solo lectura"}
+
+  const handleSave=async()=>{
+    if(pw.next&&pw.next!==pw.confirm){toast("Las contraseñas no coinciden","err");return}
+    setSaving(true)
+    try{
+      const {usersAPI}=await import("./auth.js")
+      const body={fullName:form.fullName,phone:form.phone}
+      if(pw.next&&pw.current) body.currentPassword=pw.current,body.newPassword=pw.next
+      await usersAPI.update(user.id,body)
+      onUpdateUser({fullName:form.fullName,phone:form.phone,changelogSub})
+      toast("Cuenta actualizada ✓")
+      onClose()
+    }catch(e){toast(e.message||"Error al guardar","err")}
+    setSaving(false)
+  }
+
+  return(
+    <Modal title="Configuración de cuenta" onClose={onClose} maxW={480}>
+      <div style={{display:"flex",flexDirection:"column",gap:16}}>
+        <Field label="Nombre completo">
+          <input style={S.inp} value={form.fullName} onChange={e=>setForm(p=>({...p,fullName:e.target.value}))} />
+        </Field>
+        <Field label="Email">
+          <input style={S.inp} value={form.email} disabled title="El email no se puede cambiar aquí" />
+        </Field>
+        <Field label="Teléfono">
+          <input style={S.inp} value={form.phone} onChange={e=>setForm(p=>({...p,phone:e.target.value}))} placeholder="+34 600 000 000" />
+        </Field>
+        <Field label="Rol"><div style={{padding:"9px 12px",background:"#f0f5f6",borderRadius:8,fontSize:14,color:T.muted,fontWeight:600}}>{ROLE_LABELS[role]||role}</div></Field>
+
+        <div style={{borderTop:`1px solid ${T.border}`,paddingTop:14}}>
+          <div style={{fontSize:12,fontWeight:700,color:T.brand,marginBottom:12,textTransform:"uppercase",letterSpacing:"0.06em"}}>Cambiar contraseña</div>
+          <div style={{display:"flex",flexDirection:"column",gap:10}}>
+            {[["Contraseña actual","current"],["Nueva contraseña","next"],["Confirmar nueva","confirm"]].map(([label,key])=>(
+              <Field key={key} label={label}>
+                <div style={{position:"relative"}}>
+                  <input style={S.inp} type={showPw?"text":"password"} value={pw[key]} onChange={e=>setPw(p=>({...p,[key]:e.target.value}))} placeholder="••••••••" />
+                  {key==="next"&&<button type="button" onClick={()=>setShowPw(s=>!s)} style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:T.muted,fontSize:11,fontWeight:600,fontFamily:"inherit"}}>{showPw?"ocultar":"ver"}</button>}
+                </div>
+              </Field>
+            ))}
+          </div>
+        </div>
+
+        <div style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",background:"#f0f5f6",borderRadius:8,border:`1px solid ${T.border}`}}>
+          <button type="button" onClick={()=>setChangelogSub(s=>!s)} style={{width:38,height:20,borderRadius:10,border:"none",cursor:"pointer",background:changelogSub?"#0a9e76":"#c5d8db",position:"relative",flexShrink:0,transition:"background 0.2s"}}>
+            <span style={{position:"absolute",top:2,left:changelogSub?19:2,width:16,height:16,borderRadius:"50%",background:"#fff",transition:"left 0.2s",display:"block"}}/>
+          </button>
+          <div style={{fontSize:13,color:T.text}}>Recibir notificaciones del changelog por email</div>
+        </div>
+
+        <div style={{display:"flex",gap:10,justifyContent:"flex-end",marginTop:4}}>
+          <Btn variant="secondary" onClick={onClose}>Cancelar</Btn>
+          <Btn onClick={handleSave} disabled={saving}>{saving?"Guardando…":"Guardar cambios"}</Btn>
+        </div>
+      </div>
+    </Modal>
+  )
 }
 
 // ── CONNECTION SELECTOR ───────────────────────────────────────────────────────
@@ -504,39 +573,131 @@ function SetupView({connections,activeId,onNew,onEdit,onSwitch,onDelete,toast,au
 //  DASHBOARD
 // ═══════════════════════════════════════════════════════════════════════════════
 function Dashboard({stockRows,alertas,albaranes,traspasos,conn,onNav,role}) {
-  const agotados=stockRows.filter(r=>r.Quantity<=0)
-  const bajoMin=stockRows.filter(r=>r.minStock>0&&r.Quantity>0&&r.Quantity<r.minStock)
-  const sobreMax=stockRows.filter(r=>r.maxStock>0&&r.Quantity>r.maxStock)
-  const valorTotal=stockRows.reduce((s,r)=>{const p=r.salePrice??0;return s+r.Quantity*p},0)
+  const isAdmin    = role==="admin"
+  const isEncarg   = role==="encargado"||role==="manager"
+  const isSuperadm = role==="superadmin"
+
+  const agotados   = stockRows.filter(r=>r.Quantity<=0)
+  const bajoMin    = stockRows.filter(r=>r.minStock>0&&r.Quantity>0&&r.Quantity<r.minStock)
+  const valorCoste = stockRows.reduce((s,r)=>s+r.Quantity*(r.costPrice??0),0)
+  const valorVenta = stockRows.reduce((s,r)=>s+r.Quantity*(r.salePrice??0),0)
+
+  const todayStr   = new Date().toISOString().slice(0,10)
+  const albHoy     = albaranes.filter(a=>a.Date?.slice(0,10)===todayStr)
+  const recentAlb  = albaranes.slice(0,6)
+
+  const fmtDate    = (d)=>{if(!d)return"—";try{return new Date(d).toLocaleDateString("es-ES",{day:"2-digit",month:"2-digit"})}catch{return d}}
+
+  // Superadmin sees global-style metrics
+  if(isSuperadm) {
+    const uniqProds = new Set(stockRows.map(r=>r.ProductId)).size
+    const kpis = [
+      {label:"Productos",val:uniqProds,icon:"box",color:T.accent},
+      {label:"Valor inventario",val:`€${valorCoste.toFixed(0)}`,icon:"euro",color:T.brand},
+      {label:"Alertas críticas",val:agotados.length+bajoMin.length,icon:"alert",color:T.red,link:"alertas"},
+      {label:"Albaranes hoy",val:albHoy.length,icon:"albaran",color:T.green,link:"albaranes"},
+    ]
+    return(
+      <div>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+          <div>
+            <h1 style={{fontSize:20,fontWeight:800,color:T.brand,margin:0}}>Visión global</h1>
+            <div style={{fontSize:12,color:T.muted,marginTop:3}}>{conn?.name||"Demo mode"}</div>
+          </div>
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:14,marginBottom:24}}>
+          {kpis.map(k=>(
+            <div key={k.label} onClick={k.link?()=>onNav(k.link):undefined} style={{...S.card,cursor:k.link?"pointer":"default",display:"flex",alignItems:"center",gap:14,padding:18,transition:"box-shadow 0.15s"}} onMouseEnter={e=>{if(k.link)e.currentTarget.style.boxShadow="0 4px 16px rgba(3,70,80,0.12)"}} onMouseLeave={e=>e.currentTarget.style.boxShadow="0 1px 3px rgba(3,70,80,0.07)"}>
+              <div style={{width:44,height:44,borderRadius:12,background:`${k.color}18`,display:"flex",alignItems:"center",justifyContent:"center",color:k.color,flexShrink:0}}><Ic n={k.icon} s={22}/></div>
+              <div><div style={{fontSize:22,fontWeight:800,color:k.color,lineHeight:1}}>{k.val}</div><div style={{fontSize:12,color:T.muted,marginTop:3}}>{k.label}</div></div>
+            </div>
+          ))}
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
+          <div style={S.card}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+              <h3 style={{fontSize:14,fontWeight:700,color:T.brand,margin:0}}>Alertas activas</h3>
+              <Btn small variant="secondary" onClick={()=>onNav("alertas")}><Ic n="alert" s={12}/>Ver</Btn>
+            </div>
+            {alertas.length===0?<Empty msg="Sin alertas" icon="check"/>:alertas.slice(0,5).map((r,i)=>(
+              <div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderBottom:`1px solid ${T.border}`}}>
+                <div style={{width:6,height:6,borderRadius:"50%",background:r.Quantity<=0?T.red:T.orange,flexShrink:0}}/>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:12,fontWeight:600,color:T.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.prod?.Name||r.ProductId}</div>
+                  <div style={{fontSize:11,color:T.muted}}>{r.whName} · {r.Quantity}/{r.minStock}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div style={S.card}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+              <h3 style={{fontSize:14,fontWeight:700,color:T.brand,margin:0}}>Últimas entradas</h3>
+              <Btn small variant="secondary" onClick={()=>onNav("albaranes")}><Ic n="albaran" s={12}/>Ver</Btn>
+            </div>
+            {recentAlb.length===0?<Empty msg="Sin albaranes" icon="albaran"/>:recentAlb.map((a,i)=>(
+              <div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderBottom:`1px solid ${T.border}`}}>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:12,fontWeight:600,color:T.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{a.Supplier?.Name||a.SupplierId||"Proveedor"}</div>
+                  <div style={{fontSize:11,color:T.muted}}>{fmtDate(a.Date)} · {(a.Lines||[]).length} líneas</div>
+                </div>
+                <StatusBadge status={a.Status}/>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Admin / Encargado dashboard
   const kpis=[
-    {label:"Productos",val:new Set(stockRows.map(r=>r.ProductId)).size,icon:"box",color:T.accent},
-    {label:"Valor stock",val:"€"+valorTotal.toFixed(0),icon:"euro",color:T.brand},
+    {label:"Valor inventario",val:`€${valorCoste.toFixed(0)}`,icon:"euro",color:T.brand},
+    {label:"Valor a PVP",val:`€${valorVenta.toFixed(0)}`,icon:"euro",color:T.accent},
     {label:"Agotados",val:agotados.length,icon:"alert",color:T.red,link:"alertas"},
     {label:"Bajo mínimo",val:bajoMin.length,icon:"alert",color:T.orange,link:"alertas"},
+    {label:"Albaranes hoy",val:albHoy.length,icon:"albaran",color:T.green,link:"albaranes"},
   ]
-  const recentAlb=albaranes.slice(0,6)
-  const fmtDate=(d)=>{if(!d)return"—";try{return new Date(d).toLocaleDateString("es-ES",{day:"2-digit",month:"2-digit"})}catch{return d}}
-  return (
+
+  const QUICK=[
+    {label:"Nuevo albarán",icon:"albaran",nav:"albaranes",color:T.accent},
+    {label:"Regularizar stock",icon:"adjust",nav:"regularizacion",color:T.brand},
+    {label:"Pedido reposición",icon:"pedido",nav:"pedidos",color:T.green},
+    {label:"Ver alertas",icon:"alert",nav:"alertas",color:T.orange},
+    ...(isAdmin?[{label:"Mi equipo",icon:"users",nav:"miequipo",color:T.purple}]:[]),
+  ]
+
+  return(
     <div>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
-        <h1 style={{fontSize:20,fontWeight:800,color:T.brand,margin:0}}>Dashboard</h1>
-        {conn&&<div style={{fontSize:12,color:T.muted}}>{conn.name||conn.agoraUrl||"Conectado"}</div>}
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20,flexWrap:"wrap",gap:10}}>
+        <div>
+          <h1 style={{fontSize:20,fontWeight:800,color:T.brand,margin:0}}>Dashboard</h1>
+          <div style={{fontSize:12,color:T.muted,marginTop:3}}>{conn?.name||"Demo mode"} · {new Date().toLocaleDateString("es-ES",{weekday:"long",day:"2-digit",month:"long"})}</div>
+        </div>
+        <Btn variant="primary" onClick={()=>onNav("albaranes")}><Ic n="plus" s={13}/>Nuevo albarán</Btn>
       </div>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:14,marginBottom:24}}>
+
+      {/* KPI cards */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(175px,1fr))",gap:12,marginBottom:20}}>
         {kpis.map(k=>(
-          <div key={k.label} onClick={k.link?()=>onNav(k.link):undefined} style={{...S.card,cursor:k.link?"pointer":"default",display:"flex",alignItems:"center",gap:14,padding:18,transition:"box-shadow 0.15s"}}
-            onMouseEnter={e=>{if(k.link)e.currentTarget.style.boxShadow="0 4px 16px rgba(3,70,80,0.12)"}}
-            onMouseLeave={e=>e.currentTarget.style.boxShadow="0 1px 3px rgba(3,70,80,0.07)"}>
-            <div style={{width:44,height:44,borderRadius:12,background:`${k.color}18`,display:"flex",alignItems:"center",justifyContent:"center",color:k.color,flexShrink:0}}>
-              <Ic n={k.icon} s={22}/>
-            </div>
-            <div>
-              <div style={{fontSize:22,fontWeight:800,color:k.color,lineHeight:1}}>{k.val}</div>
-              <div style={{fontSize:12,color:T.muted,marginTop:3}}>{k.label}</div>
-            </div>
+          <div key={k.label} onClick={k.link?()=>onNav(k.link):undefined} style={{...S.card,cursor:k.link?"pointer":"default",display:"flex",alignItems:"center",gap:12,padding:16,transition:"box-shadow 0.15s"}} onMouseEnter={e=>{if(k.link)e.currentTarget.style.boxShadow="0 4px 16px rgba(3,70,80,0.12)"}} onMouseLeave={e=>e.currentTarget.style.boxShadow="0 1px 3px rgba(3,70,80,0.07)"}>
+            <div style={{width:40,height:40,borderRadius:11,background:`${k.color}18`,display:"flex",alignItems:"center",justifyContent:"center",color:k.color,flexShrink:0}}><Ic n={k.icon} s={20}/></div>
+            <div><div style={{fontSize:20,fontWeight:800,color:k.color,lineHeight:1}}>{k.val}</div><div style={{fontSize:11,color:T.muted,marginTop:3}}>{k.label}</div></div>
           </div>
         ))}
       </div>
+
+      {/* Quick access */}
+      <div style={{...S.card,padding:"14px 16px",marginBottom:16}}>
+        <div style={{fontSize:12,fontWeight:700,color:T.muted,textTransform:"uppercase",letterSpacing:"0.07em",marginBottom:10}}>Acceso rápido</div>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+          {QUICK.map(q=>(
+            <button key={q.nav} onClick={()=>onNav(q.nav)} style={{display:"flex",alignItems:"center",gap:6,padding:"8px 14px",borderRadius:8,border:`1px solid ${q.color}30`,background:`${q.color}10`,color:q.color,cursor:"pointer",fontSize:12,fontWeight:600,fontFamily:"inherit",minHeight:36}}>
+              <Ic n={q.icon} s={14}/>{q.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
         <div style={S.card}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
@@ -1944,6 +2105,22 @@ export default function App() {
   useEffect(()=>{
     if(!user) return
     const r=user.role||"readonly"
+    // Demo users bypass Ágora entirely and load mock data directly
+    if(isDemoUser(user.username)){
+      const maestros=getMockMaestros()
+      setProducts(maestros.Products||[])
+      setStocks(maestros.Stocks||[])
+      setSuppliers(maestros.Suppliers||[])
+      setWarehouses(maestros.Warehouses||[])
+      const albData=getMockAlbaranes()
+      setAlbaranes((albData.IncomingDeliveryNotes||[]).map(a=>({...a,_synced:true})))
+      const trpData=getMockTraspasos()
+      setTraspasos(trpData.StockTransfers||[])
+      setConnected(true)
+      setAgoraState("active")
+      setView("dashboard")
+      return
+    }
     if(configured){
       setView("dashboard")
       doSync(activeConn)
@@ -2244,7 +2421,7 @@ export default function App() {
           <div style={{width:34,height:34,borderRadius:9,background:T.accent,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
             <Ic n="warehouse" s={17}/>
           </div>
-          <div>
+          <div className="sidebar-logo-text">
             <div style={{fontSize:14,fontWeight:700,color:"#fff",letterSpacing:"-0.2px"}}><span style={{color:T.accent}}>rekor</span><span style={{color:"rgba(255,255,255,0.45)"}}>.es</span></div>
             <div style={{fontSize:10,color:"rgba(255,255,255,0.4)",letterSpacing:"0.1em",textTransform:"uppercase"}}>StockIn</div>
           </div>
@@ -2258,19 +2435,19 @@ export default function App() {
         {NAV_ITEMS.map(item=>(
           <button key={item.id} onClick={()=>navigate(item.id)} style={{width:"100%",display:"flex",alignItems:"center",gap:8,padding:"9px 10px",borderRadius:8,border:"none",cursor:"pointer",marginBottom:1,fontFamily:"inherit",background:view===item.id?"rgba(255,255,255,0.12)":"transparent",color:view===item.id?"#fff":"rgba(255,255,255,0.55)",fontSize:13,fontWeight:view===item.id?600:400,textAlign:"left"}}>
             <Ic n={item.icon} s={15}/>
-            <span style={{flex:1}}>{item.label}</span>
-            {item.badge&&<span style={{background:item.bc,color:item.bc===T.yellow?"#000":"#fff",borderRadius:20,padding:"1px 7px",fontSize:10,fontWeight:700}}>{item.badge}</span>}
+            <span className="sidebar-label" style={{flex:1}}>{item.label}</span>
+            {item.badge&&<span className="sidebar-label" style={{background:item.bc,color:item.bc===T.yellow?"#000":"#fff",borderRadius:20,padding:"1px 7px",fontSize:10,fontWeight:700}}>{item.badge}</span>}
           </button>
         ))}
       </nav>
       <div style={{padding:"10px 10px 4px",borderTop:"1px solid rgba(255,255,255,0.1)"}}>
-        <div style={{display:"flex",alignItems:"center",gap:8,padding:"8px 6px",borderRadius:8,background:"rgba(255,255,255,0.07)",marginBottom:6}}>
+        <div style={{display:"flex",alignItems:"center",gap:8,padding:"8px 6px",borderRadius:8,background:"rgba(255,255,255,0.07)",marginBottom:6,cursor:"pointer"}} onClick={()=>setModal("account")} title="Configuración de cuenta">
           <div style={{width:32,height:32,borderRadius:8,background:ROLE_BADGE_COLOR[role]||T.muted,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:13,fontWeight:700,color:"#fff"}}>{user.fullName?.[0]?.toUpperCase()||"?"}</div>
-          <div style={{flex:1,minWidth:0}}>
+          <div className="sidebar-label" style={{flex:1,minWidth:0}}>
             <div style={{fontSize:12,fontWeight:600,color:"#fff",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{user.fullName}</div>
             <div style={{fontSize:10,color:"rgba(255,255,255,0.5)"}}>{ROLE_BADGE_LABEL[role]||role}</div>
           </div>
-          <button onClick={handleLogout} title="Cerrar sesión" style={{background:"rgba(255,255,255,0.1)",border:"none",borderRadius:6,color:"rgba(255,255,255,0.6)",cursor:"pointer",padding:"5px",display:"flex"}}>
+          <button onClick={e=>{e.stopPropagation();handleLogout()}} title="Cerrar sesión" style={{background:"rgba(255,255,255,0.1)",border:"none",borderRadius:6,color:"rgba(255,255,255,0.6)",cursor:"pointer",padding:"5px",display:"flex"}}>
             <Ic n="logout" s={14}/>
           </button>
         </div>
@@ -2351,6 +2528,7 @@ export default function App() {
         <ManageConnections connections={connections} activeId={activeId} onSwitch={switchConn} onDelete={deleteConn} onEdit={(c)=>{setEditConn(c);setModal("edit-conn")}} onClose={()=>setModal(null)}/>
         <div style={{marginTop:14,display:"flex",justifyContent:"flex-end"}}><Btn variant="primary" onClick={()=>setModal("new-conn")}><Ic n="plus" s={13}/>Añadir conexión</Btn></div>
       </Modal>}
+      {modal==="account"&&<AccountSettingsModal user={user} role={role} onClose={()=>setModal(null)} toast={toast} onUpdateUser={u=>setUser(prev=>({...prev,...u}))}/>}
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap');
         *{box-sizing:border-box;margin:0;padding:0}
@@ -2363,7 +2541,27 @@ export default function App() {
         @keyframes slideRight{from{transform:translateX(-100%)}to{transform:none}}
         @keyframes slideDown{from{opacity:0;transform:translateY(-100%)}to{opacity:1;transform:none}}
         @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
-        @media(max-width:768px){.sidebar-desktop{display:none !important}.topbar-mobile{display:flex !important}.main-pad{padding:16px 14px !important}}
+        @media(max-width:768px){
+          .sidebar-desktop{display:none !important}
+          .topbar-mobile{display:flex !important}
+          .main-pad{padding:12px 12px !important}
+          table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch}
+          button{min-height:44px}
+          input,select,textarea{font-size:16px !important}
+          .hide-mobile{display:none !important}
+          .page-header-wrap{flex-direction:column;align-items:flex-start !important}
+          .card-grid{grid-template-columns:1fr !important}
+        }
+        @media(max-width:480px){
+          .main-pad{padding:10px !important}
+          .modal-inner{max-width:100% !important;margin:0 !important;border-radius:12px 12px 0 0 !important}
+          .grid-2col{grid-template-columns:1fr !important}
+        }
+        @media(min-width:769px) and (max-width:1024px){
+          .sidebar-desktop{width:60px !important}
+          .sidebar-label{display:none !important}
+          .sidebar-logo-text{display:none !important}
+        }
         @media(min-width:769px){.topbar-mobile{display:none !important}}
       `}</style>
     </div>

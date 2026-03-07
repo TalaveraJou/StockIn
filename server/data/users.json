@@ -1,29 +1,29 @@
 [
   {
-    "id": "1",
-    "username": "admin",
+    "id": "demo_admin",
+    "username": "admin@tpvrent.es",
     "passwordHash": "$2a$10$jHvWWOR0os0ENfN4hcetQOo9ikER5poK1Sx6kkq0EkAnqreaAzJVq",
-    "fullName": "Administrador Demo",
+    "fullName": "María Gómez",
     "role": "admin",
     "active": true,
     "createdAt": "2024-01-01T00:00:00.000Z",
     "lastLogin": null
   },
   {
-    "id": "2",
-    "username": "encargado",
+    "id": "demo_enc",
+    "username": "encargado@tpvrent.es",
     "passwordHash": "$2a$10$NExuZfINVdSJCuFuPLcu4u2UH49l.gtZQBr8gF4fVnsMMPkHUNLY.",
-    "fullName": "Encargado Demo",
+    "fullName": "Carlos Martín",
     "role": "encargado",
     "active": true,
     "createdAt": "2024-01-01T00:00:00.000Z",
     "lastLogin": null
   },
   {
-    "id": "3",
-    "username": "camarero",
+    "id": "demo_cam",
+    "username": "camarero@tpvrent.es",
     "passwordHash": "$2a$10$HsN7c1fG50q8BcFS.A3kf.sezODUwOMPMYKepJC8oKpJAN5C1y5US",
-    "fullName": "Camarero Demo",
+    "fullName": "Ana López",
     "role": "camarero",
     "active": true,
     "createdAt": "2024-01-01T00:00:00.000Z",

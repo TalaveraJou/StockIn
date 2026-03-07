@@ -34,21 +34,21 @@ const LOCAL_DATA_DIR = join(__dirname, 'data')
 // Usuarios de demo que se usan cuando no hay users.json persistente
 const DEFAULT_USERS = [
   {
-    id: '1', username: 'admin',
+    id: 'demo_admin', username: 'admin@tpvrent.es',
     passwordHash: '$2a$10$jHvWWOR0os0ENfN4hcetQOo9ikER5poK1Sx6kkq0EkAnqreaAzJVq',
-    fullName: 'Administrador Demo', role: 'admin',
+    fullName: 'María Gómez', role: 'admin',
     active: true, createdAt: '2024-01-01T00:00:00.000Z', lastLogin: null,
   },
   {
-    id: '2', username: 'encargado',
+    id: 'demo_enc', username: 'encargado@tpvrent.es',
     passwordHash: '$2a$10$NExuZfINVdSJCuFuPLcu4u2UH49l.gtZQBr8gF4fVnsMMPkHUNLY.',
-    fullName: 'Encargado Demo', role: 'encargado',
+    fullName: 'Carlos Martín', role: 'encargado',
     active: true, createdAt: '2024-01-01T00:00:00.000Z', lastLogin: null,
   },
   {
-    id: '3', username: 'camarero',
+    id: 'demo_cam', username: 'camarero@tpvrent.es',
     passwordHash: '$2a$10$HsN7c1fG50q8BcFS.A3kf.sezODUwOMPMYKepJC8oKpJAN5C1y5US',
-    fullName: 'Camarero Demo', role: 'camarero',
+    fullName: 'Ana López', role: 'camarero',
     active: true, createdAt: '2024-01-01T00:00:00.000Z', lastLogin: null,
   },
 ]
@@ -389,14 +389,13 @@ app.get('/api/sa/distributors/:id', authMiddleware, superadminOnly, (req, res) =
 })
 
 app.post('/api/sa/distributors', authMiddleware, superadminOnly, async (req, res) => {
-  const { name, company, email, phone, password } = req.body
-  if (!name || !email || !password) return res.status(400).json({ error: 'Nombre, email y contraseña son obligatorios' })
+  const { name, contactEmail, contactPhone, notes } = req.body
+  if (!name) return res.status(400).json({ error: 'El nombre del distribuidor es obligatorio' })
   const dists = readJSON('distributors.json')
-  if (dists.find(d => d.email === email)) return res.status(409).json({ error: 'Ya existe un distribuidor con ese email' })
   const newDist = {
-    id: `dist_${Date.now()}`, name, company: company||'', email, phone: phone||'',
-    passwordHash: await bcrypt.hash(password, 10),
-    status: 'active', createdAt: new Date().toISOString(), notes: '',
+    id: `dist_${Date.now()}`, name,
+    contactEmail: contactEmail||'', contactPhone: contactPhone||'',
+    status: 'active', createdAt: new Date().toISOString(), notes: notes||'',
   }
   dists.push(newDist)
   writeJSON('distributors.json', dists)
@@ -409,13 +408,11 @@ app.put('/api/sa/distributors/:id', authMiddleware, superadminOnly, async (req, 
   const dists = readJSON('distributors.json')
   const idx   = dists.findIndex(d => d.id === req.params.id)
   if (idx === -1) return res.status(404).json({ error: 'Distribuidor no encontrado' })
-  const { name, company, email, phone, password, notes } = req.body
-  if (name    !== undefined) dists[idx].name    = name
-  if (company !== undefined) dists[idx].company = company
-  if (email   !== undefined) dists[idx].email   = email
-  if (phone   !== undefined) dists[idx].phone   = phone
-  if (notes   !== undefined) dists[idx].notes   = notes
-  if (password) dists[idx].passwordHash = await bcrypt.hash(password, 10)
+  const { name, contactEmail, contactPhone, notes } = req.body
+  if (name         !== undefined) dists[idx].name         = name
+  if (contactEmail !== undefined) dists[idx].contactEmail = contactEmail
+  if (contactPhone !== undefined) dists[idx].contactPhone = contactPhone
+  if (notes        !== undefined) dists[idx].notes        = notes
   writeJSON('distributors.json', dists)
   res.json({ ok: true })
 })

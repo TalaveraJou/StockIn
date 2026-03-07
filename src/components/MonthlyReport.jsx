@@ -133,18 +133,17 @@ export function generateMonthlyPDF({ stockRows, albaranes, alertas, connName, mo
 
 // ── Main component ────────────────────────────────────────────────────────────
 export default function MonthlyReport({ stockRows, albaranes, alertas, conn, toast }) {
-  const [cfg, setCfg]           = useState(null)
+  const defaultCfg = { enabled:false, recipients:'', senderName:'StockIn Reports', sendDay:1, smtp:{host:'',port:587,user:'',pass:''} }
+  const [cfg, setCfg]           = useState(defaultCfg)
   const [history, setHistory]   = useState([])
-  const [loading, setLoading]   = useState(true)
   const [saving, setSaving]     = useState(false)
   const [testing, setTesting]   = useState(false)
   const [generating, setGenerating] = useState(false)
 
   useEffect(() => {
     Promise.all([emailAPI.getConfig(), emailAPI.getHistory()])
-      .then(([c, h]) => { setCfg(c); setHistory(h) })
-      .catch(() => toast('Error al cargar config email', 'err'))
-      .finally(() => setLoading(false))
+      .then(([c, h]) => { if(c) setCfg(c); setHistory(Array.isArray(h)?h:[]) })
+      .catch(() => {/* email config optional — keep defaults */})
   }, [])
 
   const handleSave = async () => {
@@ -178,24 +177,87 @@ export default function MonthlyReport({ stockRows, albaranes, alertas, conn, toa
     finally { setGenerating(false) }
   }
 
-  if (loading) return <div style={{ padding:40, textAlign:'center', color:T.muted }}>Cargando…</div>
-  if (!cfg) return null
+  const valorCoste   = stockRows.reduce((a, r) => a + r.Quantity * (r.costPrice ?? 0), 0)
+  const valorVenta   = stockRows.reduce((a, r) => a + r.Quantity * (r.salePrice ?? 0), 0)
+  const uniqueProds  = new Set(stockRows.map(r => r.ProductId)).size
+  const topProviders = [...(stockRows.reduce((map, r) => {
+    const sup = r.prod?.SupplierName || '—'
+    map.set(sup, (map.get(sup) || 0) + r.Quantity * (r.costPrice ?? 0))
+    return map
+  }, new Map())).entries()].sort((a,b)=>b[1]-a[1]).slice(0,5)
 
   return (
-    <div style={{ animation:'fadeUp 0.3s ease', maxWidth:700 }}>
-      <div style={{ marginBottom:22 }}>
-        <h1 style={{ fontSize:22, fontWeight:800, color:T.brand }}>Informe Mensual</h1>
-        <p style={{ fontSize:12, color:T.muted }}>Genera y envía el informe mensual por email automáticamente</p>
+    <div style={{ animation:'fadeUp 0.3s ease', maxWidth:760 }}>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:20, flexWrap:'wrap', gap:12 }}>
+        <div>
+          <h1 style={{ fontSize:22, fontWeight:800, color:T.brand, margin:0 }}>Informe Mensual</h1>
+          <p style={{ fontSize:12, color:T.muted, margin:'4px 0 0' }}>Resumen de inventario y compras · {new Date().toLocaleDateString('es-ES',{month:'long',year:'numeric'})}</p>
+        </div>
+        <Btn variant="primary" onClick={handleGeneratePDF} disabled={generating}>
+          {generating ? 'Generando…' : 'Descargar PDF'}
+        </Btn>
       </div>
 
-      {/* Generate PDF */}
+      {/* KPI summary cards */}
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px, 1fr))', gap:10, marginBottom:16 }}>
+        {[
+          { label:'Valor inventario', value:`${valorCoste.toFixed(0)} €`, sub:'a precio de coste', color:T.accent },
+          { label:'Valor a PVP', value:`${valorVenta.toFixed(0)} €`, sub:'a precio de venta', color:T.brand },
+          { label:'Productos', value:uniqueProds, sub:'referencias en stock', color:T.green },
+          { label:'Alertas activas', value:alertas.length, sub:'bajo mínimo o agotados', color: alertas.length>0 ? T.red : T.green },
+          { label:'Albaranes', value:albaranes.length, sub:'recibidos este mes', color:T.muted },
+        ].map(k => (
+          <div key={k.label} style={{ ...S.card, padding:'14px 16px' }}>
+            <div style={{ fontSize:11, fontWeight:700, color:T.muted, textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:4 }}>{k.label}</div>
+            <div style={{ fontSize:22, fontWeight:800, color:k.color }}>{k.value}</div>
+            <div style={{ fontSize:11, color:T.muted, marginTop:2 }}>{k.sub}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Top products by value */}
+      {stockRows.length > 0 && (
+        <div style={{ ...S.card, marginBottom:14 }}>
+          <div style={{ fontSize:13, fontWeight:700, color:T.brand, marginBottom:12 }}>Top productos por valor en stock</div>
+          <table style={{ width:'100%', borderCollapse:'collapse' }}>
+            <thead>
+              <tr>{['Producto','Stock','P. Coste','Valor'].map(h=><th key={h} style={{ textAlign:'left', fontSize:10, fontWeight:700, color:T.muted, textTransform:'uppercase', padding:'4px 8px', borderBottom:`1px solid ${T.border}` }}>{h}</th>)}</tr>
+            </thead>
+            <tbody>
+              {[...stockRows].sort((a,b)=>(b.Quantity*(b.costPrice??0))-(a.Quantity*(a.costPrice??0))).slice(0,8).map((r,i)=>(
+                <tr key={i} style={{ background: i%2===0 ? '#f8fbfc' : '#fff' }}>
+                  <td style={{ padding:'7px 8px', fontSize:13, color:T.text }}>{r.prod?.Name||'—'}</td>
+                  <td style={{ padding:'7px 8px', fontSize:13, color:T.text }}>{r.Quantity}</td>
+                  <td style={{ padding:'7px 8px', fontSize:13, color:T.muted }}>{(r.costPrice??0).toFixed(2)} €</td>
+                  <td style={{ padding:'7px 8px', fontSize:13, fontWeight:600, color:T.brand }}>{(r.Quantity*(r.costPrice??0)).toFixed(2)} €</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Top providers */}
+      {topProviders.length > 0 && (
+        <div style={{ ...S.card, marginBottom:14 }}>
+          <div style={{ fontSize:13, fontWeight:700, color:T.brand, marginBottom:12 }}>Proveedores por valor de stock</div>
+          {topProviders.map(([name, val], i) => (
+            <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'7px 0', borderBottom: i<topProviders.length-1 ? `1px solid ${T.border}` : 'none' }}>
+              <span style={{ fontSize:13, color:T.text }}>{name}</span>
+              <span style={{ fontSize:13, fontWeight:700, color:T.accent }}>{val.toFixed(2)} €</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Generate PDF card */}
       <div style={{ ...S.card, marginBottom:14, display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:12 }}>
         <div>
-          <div style={{ fontSize:14, fontWeight:700, color:T.brand }}>📊 Informe del mes actual</div>
+          <div style={{ fontSize:14, fontWeight:700, color:T.brand }}>Informe PDF completo</div>
           <div style={{ fontSize:12, color:T.muted, marginTop:2 }}>{stockRows.length} productos · {albaranes.length} albaranes · {alertas.length} alertas</div>
         </div>
         <Btn variant="primary" onClick={handleGeneratePDF} disabled={generating}>
-          {generating ? 'Generando…' : '⬇ Descargar PDF'}
+          {generating ? 'Generando…' : 'Descargar PDF'}
         </Btn>
       </div>
 

@@ -528,6 +528,9 @@ const ROLE_COLORS = { admin: T.accent, encargado: T.brand, camarero: T.green, ma
 
 function UserForm({ initial, distributors, locations, onSave, onCancel, saving }) {
   const [form, setForm] = useState({ username: '', fullName: '', password: '', role: 'encargado', locationId: '', distributorId: '', active: true, ...initial })
+  const [confirmPw, setConfirmPw]   = useState('')
+  const [showPw,    setShowPw]      = useState(false)
+  const [pwErr,     setPwErr]       = useState('')
   const [filteredLocs, setFilteredLocs] = useState([])
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }))
 
@@ -535,15 +538,56 @@ function UserForm({ initial, distributors, locations, onSave, onCancel, saving }
     setFilteredLocs(locations.filter(l => !form.distributorId || l.distributorId === form.distributorId))
   }, [form.distributorId, locations])
 
+  const handleSave = () => {
+    if (!initial?.id && form.password !== confirmPw) { setPwErr('Las contraseñas no coinciden'); return }
+    if (initial?.id && form.password && form.password !== confirmPw) { setPwErr('Las contraseñas no coinciden'); return }
+    setPwErr('')
+    onSave(form)
+  }
+
+  const isNew = !initial?.id
+  const pwRequired = isNew && !form.password
+  const canSave = form.username.trim() && form.fullName.trim() && !pwRequired && !pwErr
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-        <Field label="Nombre completo *"><input style={S.inp} value={form.fullName} onChange={e => set('fullName', e.target.value)} /></Field>
-        <Field label="Usuario *"><input style={S.inp} value={form.username} onChange={e => set('username', e.target.value)} /></Field>
+        <Field label="Nombre completo *"><input style={S.inp} value={form.fullName} onChange={e => set('fullName', e.target.value)} placeholder="Nombre y apellido" /></Field>
+        <Field label="Email / Usuario *"><input style={S.inp} value={form.username} onChange={e => set('username', e.target.value)} placeholder="usuario@ejemplo.com" /></Field>
       </div>
-      <Field label={initial?.id ? 'Nueva contraseña (dejar vacío para no cambiar)' : 'Contraseña *'}>
-        <input style={S.inp} type="password" value={form.password} onChange={e => set('password', e.target.value)} />
-      </Field>
+
+      {/* Password fields */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <Field label={isNew ? 'Contraseña *' : 'Nueva contraseña (vacío = no cambiar)'}>
+          <div style={{ position: 'relative' }}>
+            <input
+              style={S.inp}
+              type={showPw ? 'text' : 'password'}
+              value={form.password}
+              onChange={e => { set('password', e.target.value); setPwErr('') }}
+              placeholder="••••••••"
+              autoComplete="new-password"
+            />
+            <button type="button" onClick={() => setShowPw(s => !s)} style={{
+              position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
+              background: 'none', border: 'none', cursor: 'pointer', color: T.muted,
+              fontSize: 11, fontWeight: 600, fontFamily: 'inherit',
+            }}>{showPw ? 'ocultar' : 'ver'}</button>
+          </div>
+        </Field>
+        <Field label="Confirmar contraseña">
+          <input
+            style={{ ...S.inp, borderColor: pwErr ? T.red : undefined }}
+            type={showPw ? 'text' : 'password'}
+            value={confirmPw}
+            onChange={e => { setConfirmPw(e.target.value); setPwErr('') }}
+            placeholder="••••••••"
+            autoComplete="new-password"
+          />
+        </Field>
+      </div>
+      {pwErr && <div style={{ fontSize: 12, color: T.red, marginTop: -8 }}>{pwErr}</div>}
+
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
         <Field label="Rol">
           <select style={S.inp} value={form.role} onChange={e => set('role', e.target.value)}>
@@ -565,10 +609,34 @@ function UserForm({ initial, distributors, locations, onSave, onCancel, saving }
           {filteredLocs.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
         </select>
       </Field>
+
+      {/* Active toggle */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: T.bg, borderRadius: 8, border: `1px solid ${T.border}` }}>
+        <button
+          type="button"
+          onClick={() => set('active', !form.active)}
+          style={{
+            width: 40, height: 22, borderRadius: 11, border: 'none', cursor: 'pointer',
+            background: form.active ? T.green : T.border2, transition: 'background 0.2s',
+            position: 'relative', flexShrink: 0,
+          }}
+        >
+          <span style={{
+            position: 'absolute', top: 3, left: form.active ? 20 : 3,
+            width: 16, height: 16, borderRadius: '50%', background: '#fff',
+            transition: 'left 0.2s', display: 'block',
+          }} />
+        </button>
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: T.text }}>{form.active ? 'Usuario activo' : 'Usuario inactivo'}</div>
+          <div style={{ fontSize: 11, color: T.muted }}>{form.active ? 'Puede iniciar sesión en StockIn' : 'No puede iniciar sesión'}</div>
+        </div>
+      </div>
+
       <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 4 }}>
         <Btn variant="secondary" onClick={onCancel}>Cancelar</Btn>
-        <Btn onClick={() => onSave(form)} disabled={saving || !form.username.trim() || !form.fullName.trim() || (!initial?.id && !form.password)}>
-          {saving ? 'Guardando…' : initial?.id ? 'Guardar cambios' : 'Crear usuario'}
+        <Btn onClick={handleSave} disabled={saving || !canSave}>
+          {saving ? 'Guardando…' : isNew ? 'Crear usuario' : 'Guardar cambios'}
         </Btn>
       </div>
     </div>
@@ -908,6 +976,146 @@ function ConfiguracionModule({ toast }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+//  CHANGELOG MODULE
+// ═══════════════════════════════════════════════════════════════════════════════
+const INITIAL_CHANGELOG = [
+  { id: 1, status: 'done',   title: 'Panel superadmin completo', desc: 'Gestión de distribuidores, locales y usuarios con roles y permisos.' },
+  { id: 2, status: 'done',   title: 'Login con demo rápido', desc: 'Acceso directo a usuarios de demo sin introducir contraseña.' },
+  { id: 3, status: 'done',   title: 'Informe mensual PDF', desc: 'Genera y descarga el informe de inventario en PDF.' },
+  { id: 4, status: 'done',   title: 'Datos mock Tpvrent Bistró', desc: 'Entorno de demo con productos, alertas, albaranes y traspasos reales.' },
+  { id: 5, status: 'wip',    title: 'Diseño responsive completo', desc: 'Adaptación a móvil, tablet y escritorio en todos los módulos.' },
+  { id: 6, status: 'wip',    title: 'Dashboard por perfil', desc: 'Widgets específicos para cada rol: admin, encargado, camarero.' },
+  { id: 7, status: 'soon',   title: 'Notificaciones push web', desc: 'Alertas de stock crítico en el navegador sin necesidad de abrir la app.' },
+  { id: 8, status: 'soon',   title: 'Integración Ágora multilocal', desc: 'Soporte para cadenas con múltiples locales en un mismo panel.' },
+  { id: 9, status: 'soon',   title: 'Exportación avanzada', desc: 'Exportar inventario, albaranes y pedidos a Excel y CSV.' },
+]
+
+const STATUS_LABELS = { done: 'Funcionando', wip: 'En proceso', soon: 'Próximamente' }
+const STATUS_COLORS = { done: '#0a9e76', wip: '#d97706', soon: '#6b8f95' }
+
+function ChangelogModule({ toast }) {
+  const [items,    setItems]    = useState(INITIAL_CHANGELOG)
+  const [editing,  setEditing]  = useState(null)   // { id } or null
+  const [sending,  setSending]  = useState(false)
+  const [newItem,  setNewItem]  = useState(null)
+
+  const update = (id, changes) => setItems(prev => prev.map(it => it.id === id ? { ...it, ...changes } : it))
+
+  const handleSend = async () => {
+    setSending(true)
+    await new Promise(r => setTimeout(r, 900))
+    setSending(false)
+    toast('Changelog enviado a usuarios suscritos ✓')
+  }
+
+  const addItem = () => {
+    const id = Date.now()
+    setNewItem({ id, status: 'soon', title: '', desc: '' })
+  }
+
+  const confirmAdd = () => {
+    if (!newItem?.title.trim()) { toast('El título es obligatorio', 'err'); return }
+    setItems(prev => [...prev, newItem])
+    setNewItem(null)
+    toast('Entrada añadida ✓')
+  }
+
+  const remove = (id) => setItems(prev => prev.filter(it => it.id !== id))
+
+  return (
+    <div style={{ maxWidth: 760 }}>
+      <PageHeader
+        title="Changelog"
+        subtitle="Estado de funcionalidades · editable · envía a usuarios suscritos"
+        action={
+          <div style={{ display: 'flex', gap: 8 }}>
+            <Btn variant="secondary" onClick={addItem}><Ic n="plus" s={13} />Añadir entrada</Btn>
+            <Btn onClick={handleSend} disabled={sending}>
+              <Ic n="mail" s={13} />{sending ? 'Enviando…' : 'Enviar a suscritos'}
+            </Btn>
+          </div>
+        }
+      />
+
+      {/* New item form */}
+      {newItem && (
+        <div style={{ ...S.card, marginBottom: 14, border: `1.5px solid ${T.accent}` }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: T.accent, marginBottom: 12, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Nueva entrada</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <Field label="Título *">
+                <input style={S.inp} value={newItem.title} onChange={e => setNewItem(p => ({ ...p, title: e.target.value }))} placeholder="Nombre de la funcionalidad" />
+              </Field>
+              <Field label="Estado">
+                <select style={S.inp} value={newItem.status} onChange={e => setNewItem(p => ({ ...p, status: e.target.value }))}>
+                  <option value="done">Funcionando</option>
+                  <option value="wip">En proceso</option>
+                  <option value="soon">Próximamente</option>
+                </select>
+              </Field>
+            </div>
+            <Field label="Descripción">
+              <textarea style={{ ...S.inp, minHeight: 60, resize: 'vertical' }} value={newItem.desc} onChange={e => setNewItem(p => ({ ...p, desc: e.target.value }))} placeholder="Breve descripción para los usuarios…" />
+            </Field>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <Btn variant="secondary" onClick={() => setNewItem(null)}>Cancelar</Btn>
+              <Btn onClick={confirmAdd}>Añadir</Btn>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Grouped by status */}
+      {['done', 'wip', 'soon'].map(status => {
+        const group = items.filter(it => it.status === status)
+        if (!group.length) return null
+        return (
+          <div key={status} style={{ marginBottom: 20 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+              <span style={{ background: `${STATUS_COLORS[status]}20`, color: STATUS_COLORS[status], borderRadius: 6, padding: '3px 10px', fontSize: 11, fontWeight: 700 }}>{STATUS_LABELS[status]}</span>
+              <span style={{ fontSize: 11, color: T.muted }}>{group.length} entrada{group.length !== 1 ? 's' : ''}</span>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {group.map(it => (
+                <div key={it.id} style={{ ...S.card, padding: '14px 16px', borderLeft: `3px solid ${STATUS_COLORS[it.status]}` }}>
+                  {editing === it.id ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 10 }}>
+                        <input style={S.inp} value={it.title} onChange={e => update(it.id, { title: e.target.value })} />
+                        <select style={{ ...S.inp, width: 'auto' }} value={it.status} onChange={e => update(it.id, { status: e.target.value })}>
+                          <option value="done">Funcionando</option>
+                          <option value="wip">En proceso</option>
+                          <option value="soon">Próximamente</option>
+                        </select>
+                      </div>
+                      <textarea style={{ ...S.inp, minHeight: 54, resize: 'vertical' }} value={it.desc} onChange={e => update(it.id, { desc: e.target.value })} />
+                      <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                        <Btn variant="danger" small onClick={() => remove(it.id)}><Ic n="trash" s={12} />Eliminar</Btn>
+                        <Btn small onClick={() => setEditing(null)}>Hecho</Btn>
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: T.text }}>{it.title}</div>
+                        {it.desc && <div style={{ fontSize: 12, color: T.muted, marginTop: 3, lineHeight: 1.5 }}>{it.desc}</div>}
+                      </div>
+                      <button onClick={() => setEditing(it.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.muted, padding: 4, borderRadius: 6, display: 'flex', flexShrink: 0 }}>
+                        <Ic n="edit" s={14} />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 //  SUPERADMIN PANEL — ROOT COMPONENT
 // ═══════════════════════════════════════════════════════════════════════════════
 const NAV = [
@@ -915,6 +1123,7 @@ const NAV = [
   { id: 'locales',        label: 'Locales',        icon: 'location' },
   { id: 'usuarios',       label: 'Usuarios',       icon: 'users' },
   { id: 'informes',       label: 'Informes',       icon: 'chart' },
+  { id: 'changelog',      label: 'Changelog',      icon: 'refresh' },
   { id: 'config',         label: 'Configuración',  icon: 'settings' },
 ]
 
@@ -979,6 +1188,7 @@ export default function SuperadminPanel({ user, onLogout }) {
           {view === 'locales'        && <LocalesModule        toast={toast} />}
           {view === 'usuarios'       && <UsuariosModule       toast={toast} />}
           {view === 'informes'       && <InformesModule       toast={toast} />}
+          {view === 'changelog'      && <ChangelogModule      toast={toast} />}
           {view === 'config'         && <ConfiguracionModule  toast={toast} />}
         </div>
       </main>

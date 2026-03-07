@@ -21,12 +21,12 @@ export const NAV_ACCESS = {
   superadmin: ['dashboard','alertas','stock','regularizacion','pedidos','historico','albaranes','traspasos','productos','proveedores','setup','usuarios','informe'],
   // admin: full ops panel + "Mi equipo"; NO setup, NO usuarios
   admin:      ['dashboard','stock','alertas','regularizacion','albaranes','traspasos','pedidos','historico','proveedores','productos','informe','miequipo'],
-  // encargado: same as admin minus "Mi equipo"
-  encargado:  ['dashboard','stock','alertas','regularizacion','albaranes','traspasos','pedidos','historico','proveedores','productos','informe'],
+  // encargado: same as admin minus "Mi equipo" and "informe"
+  encargado:  ['dashboard','stock','alertas','regularizacion','albaranes','traspasos','pedidos','historico','proveedores','productos'],
   // camarero: only albaranes (rendered with minimal layout)
   camarero:   ['albaranes'],
   // legacy aliases
-  manager:    ['dashboard','stock','alertas','regularizacion','albaranes','traspasos','pedidos','historico','proveedores','productos','informe'],
+  manager:    ['dashboard','stock','alertas','regularizacion','albaranes','traspasos','pedidos','historico','proveedores','productos'],
   employee:   ['albaranes'],
   readonly:   ['dashboard','alertas','stock'],
 }
