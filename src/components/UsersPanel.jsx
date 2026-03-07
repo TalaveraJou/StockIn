@@ -12,8 +12,8 @@ const S = {
   thSt:  { padding:'9px 14px', textAlign:'left', fontSize:10, fontWeight:700, color:T.muted, textTransform:'uppercase', letterSpacing:'0.06em', borderBottom:`1px solid ${T.border}`, whiteSpace:'nowrap' },
 }
 
-const ROLE_LABELS  = { admin:'Administrador', manager:'Encargado', employee:'Empleado', readonly:'Solo lectura' }
-const ROLE_COLORS  = { admin:T.accent, manager:T.brand, employee:T.green, readonly:T.muted }
+const ROLE_LABELS  = { admin:'Admin', encargado:'Encargado', camarero:'Camarero', manager:'Encargado', employee:'Camarero', readonly:'Solo lectura' }
+const ROLE_COLORS  = { admin:T.accent, encargado:T.brand, camarero:T.green, manager:T.brand, employee:T.green, readonly:T.muted }
 
 function Badge({ color, label }) {
   return <span style={{ background:`${color}18`, color, borderRadius:5, padding:'3px 9px', fontSize:11, fontWeight:600 }}>{label}</span>
@@ -115,10 +115,9 @@ function UserForm({ initial, onSave, onCancel }) {
       <div>
         <label style={S.label}>Rol *</label>
         <select value={f.role} onChange={e => setF(p => ({ ...p, role: e.target.value }))} style={S.inp}>
-          <option value="admin">Administrador — acceso total (sin gestión de usuarios)</option>
-          <option value="manager">Encargado — gestión sin precios de coste</option>
-          <option value="employee">Empleado — solo conteos de stock</option>
-          <option value="readonly">Solo lectura — dashboard y alertas</option>
+          <option value="admin">Admin — panel completo + Mi equipo</option>
+          <option value="encargado">Encargado — mismo que admin sin Mi equipo</option>
+          <option value="camarero">Camarero — solo albaranes</option>
         </select>
       </div>
       {err && (

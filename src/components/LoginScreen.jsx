@@ -170,10 +170,10 @@ export default function LoginScreen({ onLogin }) {
         <div style={{ marginTop: 24, padding: '14px', background: T.bg, borderRadius: 10, fontSize: 11, color: T.muted, lineHeight: 1.7 }}>
           <div style={{ fontWeight: 700, color: T.brand, marginBottom: 6 }}>Usuarios de demo:</div>
           {[
-            ['admin',     'admin123',     'Admin — panel completo + Mi equipo'],
-            ['encargado', 'encargado123', 'Encargado — mismo que admin sin Mi equipo'],
-            ['camarero',  'camarero123',  'Camarero — solo albaranes'],
-            ['superadmin','super123',     'SuperAdmin — configuración y usuarios'],
+            ['admin',        'admin123',     'Admin — panel completo + Mi equipo'],
+            ['encargado',    'encargado123', 'Encargado — mismo que admin sin Mi equipo'],
+            ['camarero',     'camarero123',  'Camarero — solo albaranes'],
+            ['superadmin',   'super123',     'SuperAdmin — conexiones y usuarios'],
           ].map(([u, p, desc]) => (
             <div key={u} style={{ display: 'flex', gap: 6, cursor: 'pointer', flexWrap: 'wrap' }}
               onClick={() => { setUsername(u); setPassword(p); setError(''); }}>
