@@ -6,32 +6,31 @@
 // readonly → dashboard + alertas + stock read-only. Zero actions.
 
 export const ROLES = {
-  ADMIN:    'admin',
-  MANAGER:  'manager',
-  EMPLOYEE: 'employee',
-  READONLY: 'readonly',
+  SUPERADMIN: 'superadmin',
+  ADMIN:      'admin',
+  MANAGER:    'manager',
+  EMPLOYEE:   'employee',
+  READONLY:   'readonly',
 }
 
 export const NAV_ACCESS = {
-  admin:    ['dashboard','alertas','stock','regularizacion','pedidos','historico','albaranes','traspasos','productos','proveedores','setup','usuarios','informe'],
-  manager:  ['dashboard','alertas','stock','regularizacion','pedidos','historico','albaranes','traspasos','productos','proveedores','informe'],
-  employee: ['dashboard','alertas','stock','regularizacion'],
-  readonly: ['dashboard','alertas','stock'],
+  // superadmin: acceso absoluto a todo, incluido el módulo de usuarios
+  superadmin: ['dashboard','alertas','stock','regularizacion','pedidos','historico','albaranes','traspasos','productos','proveedores','setup','usuarios','informe'],
+  // admin: igual que antes, pero SIN el módulo de usuarios
+  admin:      ['dashboard','alertas','stock','regularizacion','pedidos','historico','albaranes','traspasos','productos','proveedores','setup','informe'],
+  manager:    ['dashboard','alertas','stock','regularizacion','pedidos','historico','albaranes','traspasos','productos','proveedores','informe'],
+  employee:   ['dashboard','alertas','stock','regularizacion'],
+  readonly:   ['dashboard','alertas','stock'],
 }
 
 export const PERMS = {
-  // Can see cost prices (CostPrice fields)
-  seeCostPrices:    (role) => role === 'admin' || role === 'manager',
-  // Can perform write actions (create, import, save)
-  canWrite:         (role) => role === 'admin' || role === 'manager',
-  // Can do regularizacion
-  canRegularize:    (role) => role === 'admin' || role === 'manager' || role === 'employee',
-  // Can manage connections (setup tab)
-  canManageConns:   (role) => role === 'admin',
-  // Can manage users
-  canManageUsers:   (role) => role === 'admin',
-  // Can see setup tab
-  canSeeSetup:      (role) => role === 'admin',
+  seeCostPrices:  (role) => role === 'superadmin' || role === 'admin' || role === 'manager',
+  canWrite:       (role) => role === 'superadmin' || role === 'admin' || role === 'manager',
+  canRegularize:  (role) => role === 'superadmin' || role === 'admin' || role === 'manager' || role === 'employee',
+  canManageConns: (role) => role === 'superadmin' || role === 'admin',
+  // Solo superadmin puede gestionar usuarios
+  canManageUsers: (role) => role === 'superadmin',
+  canSeeSetup:    (role) => role === 'superadmin' || role === 'admin',
 }
 
 // ── API client ────────────────────────────────────────────────────────────────

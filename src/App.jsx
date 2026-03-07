@@ -1945,8 +1945,8 @@ export default function App() {
   if(authLoading) return <div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100vh",background:"#f0f5f6",fontFamily:"sans-serif",color:"#6b8f95"}}>Cargando…</div>
   if(!user) return <LoginScreen onLogin={async(u,p)=>{const d=await authAPI.login(u,p);sessionStorage.setItem("stockin_token",d.token);setUser(d.user);if(configured){setView("dashboard");doSync(activeConn)}else setView("setup")}}/>
 
-  const ROLE_BADGE_COLOR={admin:T.accent,manager:T.brand,employee:T.green,readonly:T.muted}
-  const ROLE_BADGE_LABEL={admin:"Admin",manager:"Encargado",employee:"Empleado",readonly:"Lectura"}
+  const ROLE_BADGE_COLOR={superadmin:"#7c3aed",admin:T.accent,manager:T.brand,employee:T.green,readonly:T.muted}
+  const ROLE_BADGE_LABEL={superadmin:"Super Admin",admin:"Admin",manager:"Encargado",employee:"Empleado",readonly:"Lectura"}
 
   const SidebarContent=()=>(
     <>

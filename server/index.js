@@ -15,6 +15,15 @@ const DATA_DIR = join(__dirname, 'data')
 const JWT_SECRET = process.env.JWT_SECRET || 'stockin-secret-key-change-in-production'
 const PORT = process.env.PORT || 3001
 
+// ── Superadmin (hardcoded, NUNCA se guarda en users.json) ─────────────────────
+const SUPERADMIN_EMAIL    = 'alvaro@tpvrent.es'
+const SUPERADMIN_PASSWORD = 'tpvrent2013'
+const SUPERADMIN = {
+  id: 'superadmin', username: SUPERADMIN_EMAIL,
+  fullName: 'Álvaro', role: 'superadmin', active: true,
+  createdAt: '2024-01-01T00:00:00.000Z',
+}
+
 // ── Data helpers ──────────────────────────────────────────────────────────────
 const readJSON = (file) => {
   const path = join(DATA_DIR, file)
@@ -52,8 +61,14 @@ const authMiddleware = (req, res, next) => {
 }
 
 const adminOnly = (req, res, next) => {
-  if (req.user.role !== 'admin')
+  if (req.user.role !== 'admin' && req.user.role !== 'superadmin')
     return res.status(403).json({ error: 'Solo administradores' })
+  next()
+}
+
+const superadminOnly = (req, res, next) => {
+  if (req.user.role !== 'superadmin')
+    return res.status(403).json({ error: 'Acceso exclusivo del superadministrador' })
   next()
 }
 
@@ -68,6 +83,20 @@ app.post('/api/auth/login', async (req, res) => {
   if (!username || !password)
     return res.status(400).json({ error: 'Usuario y contraseña requeridos' })
 
+  // ── Superadmin (credenciales fijas, no en users.json) ──────────────────────
+  if (username === SUPERADMIN_EMAIL) {
+    if (password !== SUPERADMIN_PASSWORD)
+      return res.status(401).json({ error: 'Credenciales incorrectas' })
+    const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown'
+    logActivity(SUPERADMIN.id, SUPERADMIN.username, 'LOGIN', ip)
+    const token = jwt.sign(
+      { id: SUPERADMIN.id, username: SUPERADMIN.username, role: SUPERADMIN.role, fullName: SUPERADMIN.fullName },
+      JWT_SECRET,
+      { expiresIn: '8h' }
+    )
+    return res.json({ token, user: { id: SUPERADMIN.id, username: SUPERADMIN.username, role: SUPERADMIN.role, fullName: SUPERADMIN.fullName } })
+  }
+
   const users = readJSON('users.json')
   const user = users.find(u => u.username === username && u.active)
   if (!user) return res.status(401).json({ error: 'Credenciales incorrectas' })
@@ -75,7 +104,6 @@ app.post('/api/auth/login', async (req, res) => {
   const valid = await bcrypt.compare(password, user.passwordHash)
   if (!valid) return res.status(401).json({ error: 'Credenciales incorrectas' })
 
-  // Update last login
   user.lastLogin = new Date().toISOString()
   writeJSON('users.json', users)
 
@@ -97,14 +125,16 @@ app.post('/api/auth/logout', authMiddleware, (req, res) => {
 })
 
 app.get('/api/auth/me', authMiddleware, (req, res) => {
+  if (req.user.id === 'superadmin')
+    return res.json({ id: SUPERADMIN.id, username: SUPERADMIN.username, role: SUPERADMIN.role, fullName: SUPERADMIN.fullName, lastLogin: null })
   const users = readJSON('users.json')
   const user = users.find(u => u.id === req.user.id)
   if (!user || !user.active) return res.status(401).json({ error: 'Usuario no encontrado o inactivo' })
   res.json({ id: user.id, username: user.username, role: user.role, fullName: user.fullName, lastLogin: user.lastLogin })
 })
 
-// ── USERS (admin only) ────────────────────────────────────────────────────────
-app.get('/api/users', authMiddleware, adminOnly, (req, res) => {
+// ── USERS (superadmin only) ───────────────────────────────────────────────────
+app.get('/api/users', authMiddleware, superadminOnly, (req, res) => {
   const users = readJSON('users.json').map(u => ({
     id: u.id, username: u.username, fullName: u.fullName,
     role: u.role, active: u.active, lastLogin: u.lastLogin, createdAt: u.createdAt,
@@ -112,14 +142,16 @@ app.get('/api/users', authMiddleware, adminOnly, (req, res) => {
   res.json(users)
 })
 
-app.post('/api/users', authMiddleware, adminOnly, async (req, res) => {
+app.post('/api/users', authMiddleware, superadminOnly, async (req, res) => {
   const { username, password, fullName, role } = req.body
   if (!username || !password || !fullName || !role)
     return res.status(400).json({ error: 'Todos los campos son obligatorios' })
+  if (username === SUPERADMIN_EMAIL)
+    return res.status(400).json({ error: 'Ese nombre de usuario está reservado' })
 
   const users = readJSON('users.json')
   if (users.find(u => u.username === username))
-    return res.status(409).json({ error: 'El nombre de usuario ya existe' })
+    return res.status(409).json({ error: 'El email / usuario ya existe' })
 
   const passwordHash = await bcrypt.hash(password, 10)
   const newUser = {
@@ -138,7 +170,10 @@ app.post('/api/users', authMiddleware, adminOnly, async (req, res) => {
   res.status(201).json({ id: newUser.id, username, fullName, role, active: true })
 })
 
-app.put('/api/users/:id', authMiddleware, adminOnly, async (req, res) => {
+app.put('/api/users/:id', authMiddleware, superadminOnly, async (req, res) => {
+  if (req.params.id === 'superadmin')
+    return res.status(400).json({ error: 'El superadmin no puede ser modificado' })
+
   const users = readJSON('users.json')
   const idx = users.findIndex(u => u.id === req.params.id)
   if (idx === -1) return res.status(404).json({ error: 'Usuario no encontrado' })
@@ -151,13 +186,13 @@ app.put('/api/users/:id', authMiddleware, adminOnly, async (req, res) => {
 
   writeJSON('users.json', users)
   const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown'
-  logActivity(req.user.id, req.user.username, 'UPDATE_USER', ip, { userId: req.params.id, changes: req.body })
+  logActivity(req.user.id, req.user.username, 'UPDATE_USER', ip, { userId: req.params.id })
   res.json({ ok: true })
 })
 
-app.delete('/api/users/:id', authMiddleware, adminOnly, (req, res) => {
-  if (req.params.id === req.user.id)
-    return res.status(400).json({ error: 'No puedes eliminar tu propia cuenta' })
+app.delete('/api/users/:id', authMiddleware, superadminOnly, (req, res) => {
+  if (req.params.id === 'superadmin')
+    return res.status(400).json({ error: 'El superadmin no puede ser eliminado' })
 
   const users = readJSON('users.json')
   const filtered = users.filter(u => u.id !== req.params.id)
@@ -170,7 +205,7 @@ app.delete('/api/users/:id', authMiddleware, adminOnly, (req, res) => {
 })
 
 // ── ACTIVITY LOG ──────────────────────────────────────────────────────────────
-app.get('/api/activity-log', authMiddleware, adminOnly, (req, res) => {
+app.get('/api/activity-log', authMiddleware, superadminOnly, (req, res) => {
   const log = readJSON('activity-log.json')
   res.json(log.slice(0, 100))
 })

@@ -76,16 +76,16 @@ export default function LoginScreen({ onLogin }) {
 
         {/* Form */}
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          {/* Username */}
+          {/* Username / Email */}
           <div>
             <label style={{ fontSize: 11, color: T.muted, display: 'block', marginBottom: 5, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-              Usuario
+              Usuario o email
             </label>
             <input
               type="text"
               value={username}
               onChange={e => setUsername(e.target.value)}
-              placeholder="nombre de usuario"
+              placeholder="usuario o email"
               autoComplete="username"
               autoFocus
               style={{
