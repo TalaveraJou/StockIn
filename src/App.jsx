@@ -70,13 +70,14 @@ const createAPI = (conn) => {
   const td = new Date().toISOString().slice(0,10)
   return {
     isIframe,
-    test:        ()       => call("GET","/api/export-master/?filter=Warehouses"),
-    getMaestros: (ids=[]) => call("GET",`/api/export-master/?filter=Products,Stocks,Suppliers,Warehouses${wp(ids)}`),
-    getWpSummary:()       => call("GET","/api/export-master/?filter=WorkplacesSummary"),
-    getAlbaranes:(ids=[]) => call("GET",`/api/export/?filter=IncomingDeliveryNotes${wp(ids)}&business-day=${td}`),
-    getTraspasos:(ids=[]) => call("GET",`/api/export/?filter=StockTransfers${wp(ids)}&business-day=${td}`),
-    importar:    (payload)=> call("POST","/api/import/",payload),
-    acmsHub:     (ids=[]) => call("POST",`/api/hub/generate-data/${ids.length?`?workplaces=${ids.join(",")}`:""}`)
+    test:         ()       => call("GET","/api/export-master/?filter=Warehouses"),
+    getMaestros:  (ids=[]) => call("GET",`/api/export-master/?filter=Products,Stocks,Suppliers,Warehouses${wp(ids)}`),
+    getWpSummary: ()       => call("GET","/api/export-master/?filter=WorkplacesSummary"),
+    getAlbaranes: (ids=[]) => call("GET",`/api/export/?filter=IncomingDeliveryNotes${wp(ids)}&business-day=${td}`),
+    getTraspasos: (ids=[]) => call("GET",`/api/export/?filter=StockTransfers${wp(ids)}&business-day=${td}`),
+    importar:     (payload)=> call("POST","/api/import/",payload),
+    acmsHub:      (ids=[]) => call("POST",`/api/hub/generate-data/${ids.length?`?workplaces=${ids.join(",")}`:""}`) ,
+    getEmployees: ()       => call("GET","/api/export-master/?filter=Employees")
   }
 }
 
@@ -371,6 +372,54 @@ function NoConnection({onSetup,onNew}) {
           <Btn onClick={onSetup} variant="secondary"><Ic n="settings" s={13}/>Configuración</Btn>
         </div>
       </div>
+    </div>
+  )
+}
+
+// ── WAITING SCREEN — shown to non-superadmin when Ágora not yet configured ────
+function WaitingScreen() {
+  return (
+    <div style={{display:"flex",alignItems:"center",justifyContent:"center",minHeight:"60vh",padding:24}}>
+      <div style={{...S.card,maxWidth:480,textAlign:"center",padding:"48px 36px"}}>
+        <div style={{fontSize:52,marginBottom:20}}>⏳</div>
+        <h2 style={{fontSize:18,fontWeight:700,color:T.brand,marginBottom:14}}>Tu plataforma StockIn está siendo configurada</h2>
+        <p style={{fontSize:14,color:T.muted,lineHeight:1.75}}>
+          En breve tendrás acceso completo. Si tienes dudas, contacta con tu administrador.
+        </p>
+      </div>
+    </div>
+  )
+}
+
+// ── AGORA BANNER — shown when Ágora connection is configured but failing ──────
+function AgoraBanner({failingSince,onRetry,syncing}) {
+  const [elapsed,setElapsed]=useState("")
+  useEffect(()=>{
+    if(!failingSince) return
+    const calc=()=>{
+      const diff=Math.floor((Date.now()-failingSince)/1000)
+      const h=Math.floor(diff/3600),m=Math.floor((diff%3600)/60)
+      if(h>0) setElapsed(`${h}h ${m}min`)
+      else if(m>0) setElapsed(`${m} min`)
+      else setElapsed("menos de 1 min")
+    }
+    calc()
+    const id=setInterval(calc,30000)
+    return()=>clearInterval(id)
+  },[failingSince])
+  return (
+    <div style={{background:"#fffbeb",borderBottom:"2px solid #d97706",padding:"10px 20px",display:"flex",alignItems:"center",gap:12,fontSize:13,color:"#92400e",flexWrap:"wrap"}}>
+      <span>⚠️</span>
+      <div style={{flex:1}}>
+        <strong>Conexión con el TPV temporalmente interrumpida</strong>
+        {elapsed&&<span style={{marginLeft:8,opacity:0.75,fontSize:12}}>· lleva {elapsed} sin conectar</span>}
+        <div style={{fontSize:12,opacity:0.8,marginTop:2}}>
+          Los cambios se guardan en cola y se enviarán automáticamente cuando se restablezca la conexión.
+        </div>
+      </div>
+      <button onClick={onRetry} disabled={syncing} style={{padding:"7px 16px",borderRadius:8,border:"1px solid #d97706",background:"#fff",color:"#92400e",cursor:syncing?"not-allowed":"pointer",fontSize:12,fontWeight:600,fontFamily:"inherit",whiteSpace:"nowrap",opacity:syncing?0.6:1,display:"flex",alignItems:"center",gap:5}}>
+        <Ic n="sync" s={12} spin={syncing}/>{syncing?"Reintentando…":"Reintentar"}
+      </button>
     </div>
   )
 }
@@ -1600,6 +1649,98 @@ function ProductosView({products,warehouses,suppliers,conn,onSave,toast,role,sup
 // ═══════════════════════════════════════════════════════════════════════════════
 //  PROVEEDORES VIEW
 // ═══════════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════════
+//  MI EQUIPO VIEW — admin only: manage Ágora employees mapped to StockIn
+// ═══════════════════════════════════════════════════════════════════════════════
+function MiEquipoView({conn,toast}) {
+  const TEAM_KEY=`stockin_team_${conn?.id||"default"}`
+  const loadCfg=()=>{try{return JSON.parse(localStorage.getItem(TEAM_KEY)||"{}")}catch{return{}}}
+  const [employees,setEmployees]=useState([])
+  const [teamCfg,setTeamCfg]=useState(loadCfg)
+  const [loading,setLoading]=useState(false)
+  const [error,setError]=useState(null)
+
+  const loadEmployees=async()=>{
+    if(!conn?.apiToken){setError("Necesitas una conexión activa con Ágora para cargar empleados.");return}
+    setLoading(true);setError(null)
+    try{
+      const api=createAPI(conn)
+      const data=await api.getEmployees()
+      const emps=data?.Employees||data?.employees||data?.WorkerList||data?.Workers||[]
+      if(emps.length===0) setError("No se encontraron empleados en Ágora. Asegúrate de que tu instalación tiene empleados configurados, o que el endpoint de empleados está disponible en esta versión de Ágora.")
+      setEmployees(emps)
+    }catch(e){setError("No se pudieron cargar los empleados de Ágora: "+e.message)}
+    finally{setLoading(false)}
+  }
+  useEffect(()=>{loadEmployees()},[conn?.id])
+
+  const save=(id,changes)=>{
+    setTeamCfg(prev=>{
+      const next={...prev,[id]:{...(prev[id]||{role:"camarero",phone:"",active:true}),...changes}}
+      localStorage.setItem(TEAM_KEY,JSON.stringify(next))
+      return next
+    })
+  }
+  const getCfg=(id)=>teamCfg[id]||{role:"camarero",phone:"",active:true}
+
+  return (
+    <div style={{maxWidth:820,margin:"0 auto"}}>
+      <div style={{marginBottom:20,display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10}}>
+        <h1 style={{fontSize:20,fontWeight:800,color:T.brand,margin:0}}>Mi equipo</h1>
+        <Btn small variant="secondary" onClick={loadEmployees} disabled={loading}><Ic n="sync" s={12} spin={loading}/>Recargar desde Ágora</Btn>
+      </div>
+      {!conn?.apiToken&&<div style={{...S.card,padding:24,textAlign:"center",color:T.muted}}>
+        <Ic n="link" s={32}/>
+        <div style={{marginTop:12,fontSize:14}}>Necesitas una conexión activa con Ágora para gestionar tu equipo.</div>
+      </div>}
+      {error&&<div style={{background:"rgba(220,53,69,0.07)",border:"1px solid rgba(220,53,69,0.2)",borderRadius:10,padding:"14px 16px",color:T.red,fontSize:13,marginBottom:16,lineHeight:1.6}}>{error}</div>}
+      {loading&&<div style={{padding:40,textAlign:"center",color:T.muted,display:"flex",flexDirection:"column",alignItems:"center",gap:10}}><Ic n="sync" s={28} spin/>Cargando empleados de Ágora…</div>}
+      {!loading&&employees.length===0&&!error&&conn?.apiToken&&(
+        <div style={{...S.card,padding:36,textAlign:"center",color:T.muted}}>
+          <div style={{fontSize:36,marginBottom:12}}>👥</div>
+          <div style={{fontSize:14}}>No se encontraron empleados en esta conexión de Ágora.</div>
+        </div>
+      )}
+      {employees.map(emp=>{
+        const id=emp.Id??emp.id??emp.WorkerId
+        const name=emp.Name||emp.FullName||emp.WorkerName||`Empleado ${id}`
+        const cfg=getCfg(id)
+        return (
+          <div key={id} style={{...S.card,marginBottom:12,display:"flex",alignItems:"center",gap:16,flexWrap:"wrap"}}>
+            <div style={{width:40,height:40,borderRadius:10,background:cfg.active?T.accent:"#c5d8db",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:16,fontWeight:700,color:"#fff"}}>{name[0]?.toUpperCase()||"?"}</div>
+            <div style={{flex:1,minWidth:140}}>
+              <div style={{fontWeight:600,color:T.text,fontSize:14}}>{name}</div>
+              <div style={{fontSize:11,color:T.muted,marginTop:2}}>ID Ágora: {id}</div>
+            </div>
+            <div style={{display:"flex",alignItems:"flex-end",gap:12,flexWrap:"wrap"}}>
+              <div>
+                <label style={S.label}>Rol en StockIn</label>
+                <select value={cfg.role} onChange={e=>save(id,{role:e.target.value})} style={{...S.inp,width:"auto",paddingRight:32,height:36}}>
+                  <option value="encargado">Encargado</option>
+                  <option value="camarero">Camarero</option>
+                </select>
+              </div>
+              <div>
+                <label style={S.label}>WhatsApp avisos (opcional)</label>
+                <input type="tel" value={cfg.phone||""} onChange={e=>save(id,{phone:e.target.value})} placeholder="+34 600 000 000" style={{...S.inp,width:170,height:36}}/>
+              </div>
+              <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4,paddingBottom:2}}>
+                <label style={S.label}>Activo</label>
+                <button onClick={()=>save(id,{active:!cfg.active})} title={cfg.active?"Desactivar acceso a StockIn":"Activar acceso a StockIn"} style={{width:46,height:26,borderRadius:13,border:"none",cursor:"pointer",background:cfg.active?T.accent:"#c5d8db",position:"relative",transition:"background 0.2s",flexShrink:0}}>
+                  <div style={{width:20,height:20,borderRadius:"50%",background:"#fff",position:"absolute",top:3,left:cfg.active?23:3,transition:"left 0.2s",boxShadow:"0 1px 3px rgba(0,0,0,0.15)"}}/>
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })}
+      {employees.length>0&&<div style={{fontSize:11,color:T.muted,marginTop:12,lineHeight:1.6,padding:"0 2px"}}>
+        Los cambios se guardan localmente asociados a la conexión de Ágora activa. Si un empleado está inactivo no podrá iniciar sesión en StockIn.
+      </div>}
+    </div>
+  )
+}
+
 function ProveedoresView({suppliers,albaranes}) {
   const [search,setSearch]=useState("")
   const filtered=suppliers.filter(s=>!search||(s.Name||"").toLowerCase().includes(search.toLowerCase()))
@@ -1646,6 +1787,85 @@ function ProveedoresView({suppliers,albaranes}) {
 // ═══════════════════════════════════════════════════════════════════════════════
 //  APP ROOT
 // ═══════════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════════
+//  CAMARERO PAGE — minimal layout, only albaranes
+// ═══════════════════════════════════════════════════════════════════════════════
+function CamareroPage({user,agoraState,failingSince,onLogout,onRetrySync,syncing,products,suppliers,warehouses,albaranes,onImportarAlbaran,toast,supplierRefs,online,queueCount}) {
+  const MY_ALBS_KEY=`stockin_camarero_albs_${user?.id||user?.username||"u"}`
+  const loadMyAlbs=()=>{try{return JSON.parse(localStorage.getItem(MY_ALBS_KEY)||"[]")}catch{return[]}}
+  const [view,setView]=useState("list")
+  const [myAlbs,setMyAlbs]=useState(loadMyAlbs)
+
+  const handleSave=async(alb)=>{
+    await onImportarAlbaran(alb)
+    const entry={...alb,_createdAt:new Date().toISOString(),_local:true}
+    setMyAlbs(prev=>{const next=[entry,...prev];localStorage.setItem(MY_ALBS_KEY,JSON.stringify(next));return next})
+    setView("list")
+  }
+
+  const ROLE_BADGE_COLOR={superadmin:"#7c3aed",admin:T.accent,encargado:T.brand,camarero:T.green,manager:T.brand,employee:T.green,readonly:T.muted}
+  const ROLE_BADGE_LABEL={superadmin:"Super Admin",admin:"Admin",encargado:"Encargado",camarero:"Camarero",manager:"Encargado",employee:"Camarero",readonly:"Lectura"}
+  const role=user?.role||"camarero"
+
+  return (
+    <div style={{fontFamily:"'IBM Plex Sans',sans-serif",background:T.bg,minHeight:"100vh",color:T.text}}>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700;800&display=swap');*{box-sizing:border-box;margin:0;padding:0}@keyframes spin{to{transform:rotate(360deg)}}@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}`}</style>
+      {/* Header */}
+      <div style={{background:T.brand,padding:"12px 20px",display:"flex",alignItems:"center",gap:12,position:"sticky",top:0,zIndex:100}}>
+        <div style={{width:32,height:32,borderRadius:8,background:T.accent,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Ic n="warehouse" s={16}/></div>
+        <div style={{flex:1}}>
+          <div style={{fontSize:14,fontWeight:700,color:"#fff"}}><span style={{color:T.accent}}>rekor</span>.es StockIn</div>
+          <div style={{fontSize:10,color:"rgba(255,255,255,0.45)",letterSpacing:"0.05em"}}>Albaranes</div>
+        </div>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <div style={{textAlign:"right"}}>
+            <div style={{fontSize:12,fontWeight:600,color:"#fff"}}>{user?.fullName||user?.username}</div>
+            <div style={{fontSize:10,color:"rgba(255,255,255,0.5)"}}>{ROLE_BADGE_LABEL[role]||role}</div>
+          </div>
+          {!online&&<div style={{width:7,height:7,borderRadius:"50%",background:T.orange,flexShrink:0}}/>}
+          <button onClick={onLogout} title="Cerrar sesión" style={{background:"rgba(255,255,255,0.1)",border:"none",borderRadius:6,color:"rgba(255,255,255,0.65)",cursor:"pointer",padding:"6px",display:"flex"}}><Ic n="logout" s={14}/></button>
+        </div>
+      </div>
+      {/* Offline banner */}
+      {!online&&<div style={{background:"rgba(234,108,0,0.1)",borderBottom:`2px solid ${T.orange}`,padding:"7px 20px",display:"flex",alignItems:"center",justifyContent:"center",gap:10,fontSize:12,fontWeight:600,color:T.orange}}>
+        ⚠ Sin conexión — las acciones se sincronizarán al reconectar.{queueCount>0&&<span style={{background:T.orange,color:"#fff",borderRadius:12,padding:"2px 8px",fontSize:11}}>{queueCount} pendiente{queueCount>1?"s":""}</span>}
+      </div>}
+      {/* Ágora failing banner */}
+      {agoraState==="failing"&&online&&<AgoraBanner failingSince={failingSince} onRetry={onRetrySync} syncing={syncing}/>}
+      {/* Main content */}
+      <div style={{maxWidth:800,margin:"0 auto",padding:"24px 20px"}}>
+        {agoraState==="unconfigured"
+          ? <WaitingScreen/>
+          : view==="list"
+            ? <>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+                  <h1 style={{fontSize:20,fontWeight:800,color:T.brand,margin:0}}>Mis albaranes</h1>
+                  <Btn onClick={()=>setView("new")} variant="primary"><Ic n="plus" s={13}/>Nuevo albarán</Btn>
+                </div>
+                {myAlbs.length===0
+                  ? <div style={{...S.card,padding:40,textAlign:"center",color:T.muted,display:"flex",flexDirection:"column",alignItems:"center",gap:10}}><Ic n="albaran" s={28}/>No has creado ningún albarán todavía.<div style={{fontSize:12}}>Pulsa "Nuevo albarán" para empezar.</div></div>
+                  : myAlbs.map((alb,i)=>(
+                    <div key={i} style={{...S.card,marginBottom:10,display:"flex",alignItems:"center",gap:14,padding:"14px 16px"}}>
+                      <div style={{width:38,height:38,borderRadius:9,background:T.bg,display:"flex",alignItems:"center",justifyContent:"center",border:`1px solid ${T.border}`,flexShrink:0}}><Ic n="albaran" s={18}/></div>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontWeight:600,color:T.text}}>{alb.Serie}-{alb.Number}</div>
+                        <div style={{fontSize:12,color:T.muted,marginTop:2}}>{alb.Date}  ·  {alb.Lines?.length||0} línea{alb.Lines?.length!==1?"s":""}{alb.Supplier?.Name?` · ${alb.Supplier.Name}`:""}</div>
+                      </div>
+                      <div style={{fontSize:11,color:T.muted,textAlign:"right",flexShrink:0}}>
+                        {new Date(alb._createdAt).toLocaleString("es-ES",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})}
+                      </div>
+                    </div>
+                  ))
+                }
+              </>
+            : <AlbaranForm products={products} suppliers={suppliers} warehouses={warehouses}
+                onSave={handleSave} onCancel={()=>setView("list")} toast={toast} supplierRefs={supplierRefs}/>
+        }
+      </div>
+    </div>
+  )
+}
+
 export default function App() {
   // ── Auth ────────────────────────────────────────────────────────────────────
   const [user,      setUser]      = useState(null)
@@ -1672,6 +1892,18 @@ export default function App() {
   const [lastSync,  setLastSync]  =useState(null)
   const [notif,     setNotif]     =useState(null)
   const [cachedAt,  setCachedAt]  =useState(null)
+
+  // ── Ágora connection state ────────────────────────────────────────────────────
+  // 'unconfigured' → superadmin hasn't set up a connection yet
+  // 'active'       → connection working correctly
+  // 'failing'      → 3+ consecutive sync failures → offline mode
+  const [agoraState,      setAgoraState]      =useState(()=>{
+    const conns=loadConnections(); const actId=loadActiveId()
+    const active=conns.find(c=>c.id===actId)
+    return active?.apiToken ? "active" : "unconfigured"
+  })
+  const [failingSince,    setFailingSince]    =useState(null)   // timestamp when failures started
+  const consecutiveFailures=useRef(0)
 
   // ── Offline ──────────────────────────────────────────────────────────────────
   const [online,     setOnline]     =useState(navigator.onLine)
@@ -1704,8 +1936,16 @@ export default function App() {
 
   useEffect(()=>{
     if(!user) return
-    if(configured){setView("dashboard");doSync(activeConn)}
-    else if(connections.length===0){setView("setup")}
+    const r=user.role||"readonly"
+    if(configured){
+      setView("dashboard")
+      doSync(activeConn)
+    }else{
+      setAgoraState("unconfigured")
+      // Only superadmin can access setup to configure the connection
+      if(r==="superadmin") setView("setup")
+      // else: admin/encargado/camarero stay at dashboard but see WaitingScreen
+    }
   },[user])
 
   // ── Online/offline ───────────────────────────────────────────────────────────
@@ -1770,7 +2010,10 @@ export default function App() {
 
   // ── Sync ─────────────────────────────────────────────────────────────────────
   const doSync=useCallback(async(conn=activeConn)=>{
-    if(!conn?.apiToken||syncing) return
+    if(!conn?.apiToken||syncing){
+      if(!conn?.apiToken) setAgoraState("unconfigured")
+      return
+    }
     setSyncing(true);setSyncErr(null)
     const api=createAPI(conn)
     const wpIds=conn.mode==="acms"&&conn.activeWorkplace?[conn.activeWorkplace]:[]
@@ -1783,6 +2026,10 @@ export default function App() {
       try{const d=await api.getAlbaranes(wpIds);const albs=norm(d,"IncomingDeliveryNotes").map(a=>({...a,_synced:true}));setAlbaranes(albs);await cacheData(`albaranes_${conn.id}`,albs)}catch{setAlbaranes([])}
       try{const d=await api.getTraspasos(wpIds);setTraspasos(norm(d,"StockTransfers"))}catch{}
       setConnected(true)
+      // Reset failure tracking on success
+      consecutiveFailures.current=0
+      setAgoraState("active")
+      setFailingSince(null)
       const ts=new Date().toLocaleTimeString("es-ES",{hour:"2-digit",minute:"2-digit"})
       setLastSync(ts);setCachedAt(null)
       // WhatsApp alert check
@@ -1792,6 +2039,12 @@ export default function App() {
       toast(`${prods.length} productos · ${stks.length} stocks cargados`)
     }catch(err){
       setConnected(false);setSyncErr(err.message)
+      // Track consecutive failures → 3 = offline mode
+      consecutiveFailures.current+=1
+      if(consecutiveFailures.current>=3){
+        setAgoraState("failing")
+        setFailingSince(prev=>prev===null?Date.now():prev)
+      }
       const cached=await getCachedData(`maestros_${conn?.id}`)
       if(cached){
         setProducts(cached.data.prods||[]);setStocks(cached.data.stks||[]);setSuppliers(cached.data.sups||[]);setWarehouses(cached.data.whs||[])
@@ -1936,6 +2189,7 @@ export default function App() {
     {id:"productos",     label:"Productos",      icon:"box"},
     {id:"proveedores",   label:"Proveedores",    icon:"proveedor"},
     {id:"informe",       label:"Informe mensual",icon:"mail"},
+    {id:"miequipo",      label:"Mi equipo",      icon:"users"},
     {id:"usuarios",      label:"Usuarios",       icon:"users"},
     {id:"setup",         label:"Configuración",  icon:"settings",badge:!configured?"!":null,bc:T.yellow},
   ].filter(item=>canSeeNav(item.id))
@@ -1943,10 +2197,32 @@ export default function App() {
   const navigate=(id)=>{setView(id);setSideOpen(false)}
 
   if(authLoading) return <div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100vh",background:"#f0f5f6",fontFamily:"sans-serif",color:"#6b8f95"}}>Cargando…</div>
-  if(!user) return <LoginScreen onLogin={async(u,p)=>{const d=await authAPI.login(u,p);sessionStorage.setItem("stockin_token",d.token);setUser(d.user);if(configured){setView("dashboard");doSync(activeConn)}else setView("setup")}}/>
 
-  const ROLE_BADGE_COLOR={superadmin:"#7c3aed",admin:T.accent,manager:T.brand,employee:T.green,readonly:T.muted}
-  const ROLE_BADGE_LABEL={superadmin:"Super Admin",admin:"Admin",manager:"Encargado",employee:"Empleado",readonly:"Lectura"}
+  // Camarero / legacy employee → full-page minimal layout (must be checked before login guard)
+  const isCamarero=PERMS.isCamarero(role)
+  const handleLogout=async()=>{try{await authAPI.logout()}catch{}sessionStorage.removeItem("stockin_token");setUser(null);setView("dashboard");setProducts([]);setStocks([]);setSuppliers([]);setWarehouses([]);setAlbaranes([]);setTraspasos([]);setConnected(null)}
+
+  if(!user) return <LoginScreen onLogin={async(u,p)=>{
+    const d=await authAPI.login(u,p)
+    sessionStorage.setItem("stockin_token",d.token)
+    setUser(d.user)
+    const r=d.user?.role||"readonly"
+    if(configured){setView("dashboard");doSync(activeConn)}
+    else if(r==="superadmin") setView("setup")
+    else setAgoraState("unconfigured")
+  }}/>
+
+  // Camarero full-page layout (no sidebar)
+  if(isCamarero) return <CamareroPage
+    user={user} agoraState={agoraState} failingSince={failingSince}
+    onLogout={handleLogout} onRetrySync={()=>doSync()} syncing={syncing}
+    products={products} suppliers={suppliers} warehouses={warehouses}
+    albaranes={albaranes} onImportarAlbaran={importarAlbaran}
+    toast={toast} supplierRefs={supplierRefs} online={online} queueCount={queueCount}
+  />
+
+  const ROLE_BADGE_COLOR={superadmin:"#7c3aed",admin:T.accent,encargado:T.brand,camarero:T.green,manager:T.brand,employee:T.green,readonly:T.muted}
+  const ROLE_BADGE_LABEL={superadmin:"Super Admin",admin:"Admin",encargado:"Encargado",camarero:"Camarero",manager:"Encargado",employee:"Camarero",readonly:"Lectura"}
 
   const SidebarContent=()=>(
     <>
@@ -1981,7 +2257,7 @@ export default function App() {
             <div style={{fontSize:12,fontWeight:600,color:"#fff",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{user.fullName}</div>
             <div style={{fontSize:10,color:"rgba(255,255,255,0.5)"}}>{ROLE_BADGE_LABEL[role]||role}</div>
           </div>
-          <button onClick={async()=>{try{await authAPI.logout()}catch{}sessionStorage.removeItem("stockin_token");setUser(null);setView("dashboard");setProducts([]);setStocks([]);setSuppliers([]);setWarehouses([]);setAlbaranes([]);setTraspasos([]);setConnected(null)}} title="Cerrar sesión" style={{background:"rgba(255,255,255,0.1)",border:"none",borderRadius:6,color:"rgba(255,255,255,0.6)",cursor:"pointer",padding:"5px",display:"flex"}}>
+          <button onClick={handleLogout} title="Cerrar sesión" style={{background:"rgba(255,255,255,0.1)",border:"none",borderRadius:6,color:"rgba(255,255,255,0.6)",cursor:"pointer",padding:"5px",display:"flex"}}>
             <Ic n="logout" s={14}/>
           </button>
         </div>
@@ -2025,17 +2301,27 @@ export default function App() {
         {showBanner&&<div style={{background:T.green,color:"#fff",padding:"9px 20px",display:"flex",alignItems:"center",justifyContent:"center",gap:8,fontSize:13,fontWeight:600,animation:"slideDown 0.3s ease"}}>
           ✓ Conexión restaurada{queueCount>0?` · sincronizando ${queueCount} acción${queueCount>1?"es":""}…`:""}
         </div>}
+        {/* Ágora failing banner — shown for all non-camarero roles when connection is failing */}
+        {agoraState==="failing"&&online&&<AgoraBanner failingSince={failingSince} onRetry={()=>{consecutiveFailures.current=0;doSync()}} syncing={syncing}/>}
         <div style={{padding:"24px 28px"}} className="main-pad">
           {notif&&<div style={{position:"fixed",top:16,right:16,zIndex:400,maxWidth:380,background:notif.type==="ok"?"#f0fdf8":notif.type==="warn"?"#fffbeb":"#fff5f5",border:`1px solid ${notif.type==="ok"?T.green:notif.type==="warn"?T.yellow:T.red}`,borderRadius:10,padding:"11px 16px",display:"flex",alignItems:"center",gap:10,color:notif.type==="ok"?T.green:notif.type==="warn"?T.yellow:T.red,fontSize:13,fontWeight:500,boxShadow:"0 4px 20px rgba(3,70,80,0.12)",animation:"slideIn 0.2s ease"}}>
             <Ic n={notif.type==="ok"?"check":"alert"} s={15}/>{notif.msg}
           </div>}
+          {/* Superadmin-only views */}
           {view==="setup"&&PERMS.canSeeSetup(role)&&<SetupView connections={connections} activeId={activeId} onNew={()=>setModal("new-conn")} onEdit={(c)=>{setEditConn(c);setModal("edit-conn")}} onSwitch={switchConn} onDelete={deleteConn} toast={toast} autoSyncInterval={autoSyncInterval} onAutoSyncChange={handleAutoSyncChange} whatsappCfg={whatsappCfg} onWhatsappSave={handleWhatsappSave}/>}
           {view==="usuarios"&&PERMS.canManageUsers(role)&&<UsersPanel currentUser={user} toast={toast}/>}
-          {view==="informe"&&<MonthlyReport stockRows={stockRows} albaranes={albaranes} alertas={alertas} conn={activeConn} toast={toast}/>}
-          {view!=="setup"&&view!=="usuarios"&&view!=="informe"&&!configured&&<NoConnection onSetup={()=>setView("setup")} onNew={()=>setModal("new-conn")}/>}
-          {view!=="setup"&&view!=="usuarios"&&view!=="informe"&&configured&&<>
+          {/* Admin-only: Mi equipo (Ágora employees mapped to StockIn roles) */}
+          {view==="miequipo"&&PERMS.canManageTeam(role)&&<MiEquipoView conn={activeConn} toast={toast}/>}
+          {/* Informe mensual */}
+          {view==="informe"&&canSeeNav("informe")&&<MonthlyReport stockRows={stockRows} albaranes={albaranes} alertas={alertas} conn={activeConn} toast={toast}/>}
+          {/* Non-superadmin waiting screen when Ágora not configured */}
+          {view!=="setup"&&view!=="usuarios"&&view!=="miequipo"&&view!=="informe"&&agoraState==="unconfigured"&&role!=="superadmin"&&<WaitingScreen/>}
+          {/* Superadmin no connection */}
+          {view!=="setup"&&view!=="usuarios"&&view!=="miequipo"&&view!=="informe"&&!configured&&role==="superadmin"&&<NoConnection onSetup={()=>setView("setup")} onNew={()=>setModal("new-conn")}/>}
+          {/* Main modules — requires connection */}
+          {view!=="setup"&&view!=="usuarios"&&view!=="miequipo"&&view!=="informe"&&agoraState!=="unconfigured"&&configured&&<>
             {syncing&&!products.length&&<LoadingScreen/>}
-            {!syncing&&connected===false&&!products.length&&!cachedAt&&<ErrorScreen error={syncErr} onRetry={()=>doSync()} onSetup={()=>setView("setup")}/>}
+            {!syncing&&connected===false&&!products.length&&!cachedAt&&role==="superadmin"&&<ErrorScreen error={syncErr} onRetry={()=>doSync()} onSetup={()=>setView("setup")}/>}
             {(products.length>0||(connected===true&&!syncing)||cachedAt)&&<>
               {view==="dashboard"&&<Dashboard stockRows={stockRows} alertas={alertas} albaranes={albaranes} traspasos={traspasos} conn={activeConn} onNav={navigate} role={role}/>}
               {view==="alertas"&&<AlertasView stockRows={stockRows} alertas={alertas} warehouses={warehouses} onIrInventario={()=>navigate("regularizacion")} role={role}/>}

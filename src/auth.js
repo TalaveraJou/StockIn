@@ -1,36 +1,49 @@
 // ── Role definitions ───────────────────────────────────────────────────────────
-// admin    → full access, sees cost prices, manages users & connections
-// manager  → sees stock/albaranes/regularizacion/pedidos/historial/productos/proveedores
-//            NO cost prices, NO config, NO user management
-// employee → only stock + regularizacion (count only). No prices. No orders/albaranes.
-// readonly → dashboard + alertas + stock read-only. Zero actions.
+// superadmin → created externally; configures Ágora connections; manages StockIn users
+// admin      → created by superadmin; full panel (excl. setup/users); manages team ("Mi equipo")
+// encargado  → same as admin but without team management
+// camarero   → only albaranes (minimal UI)
+// legacy aliases: manager = encargado, employee = camarero
 
 export const ROLES = {
   SUPERADMIN: 'superadmin',
   ADMIN:      'admin',
+  ENCARGADO:  'encargado',
+  CAMARERO:   'camarero',
+  // backward compat
   MANAGER:    'manager',
   EMPLOYEE:   'employee',
   READONLY:   'readonly',
 }
 
 export const NAV_ACCESS = {
-  // superadmin: acceso absoluto a todo, incluido el módulo de usuarios
+  // superadmin: absolute access including setup and user management
   superadmin: ['dashboard','alertas','stock','regularizacion','pedidos','historico','albaranes','traspasos','productos','proveedores','setup','usuarios','informe'],
-  // admin: igual que antes, pero SIN el módulo de usuarios
-  admin:      ['dashboard','alertas','stock','regularizacion','pedidos','historico','albaranes','traspasos','productos','proveedores','setup','informe'],
-  manager:    ['dashboard','alertas','stock','regularizacion','pedidos','historico','albaranes','traspasos','productos','proveedores','informe'],
-  employee:   ['dashboard','alertas','stock','regularizacion'],
+  // admin: full ops panel + "Mi equipo"; NO setup, NO usuarios
+  admin:      ['dashboard','stock','alertas','regularizacion','albaranes','traspasos','pedidos','historico','proveedores','productos','informe','miequipo'],
+  // encargado: same as admin minus "Mi equipo"
+  encargado:  ['dashboard','stock','alertas','regularizacion','albaranes','traspasos','pedidos','historico','proveedores','productos','informe'],
+  // camarero: only albaranes (rendered with minimal layout)
+  camarero:   ['albaranes'],
+  // legacy aliases
+  manager:    ['dashboard','stock','alertas','regularizacion','albaranes','traspasos','pedidos','historico','proveedores','productos','informe'],
+  employee:   ['albaranes'],
   readonly:   ['dashboard','alertas','stock'],
 }
 
 export const PERMS = {
-  seeCostPrices:  (role) => role === 'superadmin' || role === 'admin' || role === 'manager',
-  canWrite:       (role) => role === 'superadmin' || role === 'admin' || role === 'manager',
-  canRegularize:  (role) => role === 'superadmin' || role === 'admin' || role === 'manager' || role === 'employee',
-  canManageConns: (role) => role === 'superadmin' || role === 'admin',
-  // Solo superadmin puede gestionar usuarios
+  seeCostPrices:  (role) => ['superadmin','admin','encargado','manager'].includes(role),
+  canWrite:       (role) => ['superadmin','admin','encargado','manager'].includes(role),
+  canRegularize:  (role) => ['superadmin','admin','encargado','manager','employee','camarero'].includes(role),
+  // Only superadmin can manage Ágora connections and app config
+  canManageConns: (role) => role === 'superadmin',
+  canSeeSetup:    (role) => role === 'superadmin',
+  // Only superadmin manages StockIn user accounts
   canManageUsers: (role) => role === 'superadmin',
-  canSeeSetup:    (role) => role === 'superadmin' || role === 'admin',
+  // Admin manages team members (Ágora employees mapped to StockIn roles)
+  canManageTeam:  (role) => role === 'admin',
+  // Camarero/employee: minimal layout, only albaranes
+  isCamarero:     (role) => role === 'camarero' || role === 'employee',
 }
 
 // ── API client ────────────────────────────────────────────────────────────────
