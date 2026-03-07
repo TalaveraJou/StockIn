@@ -1,0 +1,15 @@
+{
+  "sessionTimeout": 480,
+  "syncInterval": 15,
+  "whatsapp": {
+    "enabled": false,
+    "apikey": "",
+    "phone": ""
+  },
+  "email": {
+    "enabled": false,
+    "smtp": { "host": "", "port": 587, "user": "", "pass": "" },
+    "senderName": "StockIn",
+    "recipients": ""
+  }
+}

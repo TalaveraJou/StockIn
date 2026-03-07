@@ -2,6 +2,8 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import LoginScreen from "./components/LoginScreen.jsx"
 import UsersPanel from "./components/UsersPanel.jsx"
 import MonthlyReport from "./components/MonthlyReport.jsx"
+import SuperadminPanel from "./components/SuperadminPanel.jsx"
+import SuspendedScreen from "./components/SuspendedScreen.jsx"
 import { authAPI, NAV_ACCESS, PERMS } from "./auth.js"
 import { addToQueue, getQueue, removeFromQueue, cacheData, getCachedData } from "./offline.js"
 
@@ -1870,6 +1872,7 @@ export default function App() {
   // ── Auth ────────────────────────────────────────────────────────────────────
   const [user,      setUser]      = useState(null)
   const [authLoading,setAuthLoading] = useState(true)
+  const [suspended, setSuspended] = useState(false)
 
   // ── Connections ─────────────────────────────────────────────────────────────
   const [connections,setConnections]=useState(loadConnections)
@@ -1931,7 +1934,11 @@ export default function App() {
   useEffect(()=>{
     const token=sessionStorage.getItem("stockin_token")
     if(!token){setAuthLoading(false);return}
-    authAPI.me().then(u=>{setUser(u);setAuthLoading(false)}).catch(()=>{sessionStorage.removeItem("stockin_token");setAuthLoading(false)})
+    authAPI.me().then(u=>{setUser(u);setAuthLoading(false)}).catch(err=>{
+      // 403 suspended: show suspended screen (keep token so user sees message)
+      if(err.message?.toLowerCase().includes("suspendido")){setSuspended(true);setAuthLoading(false);return}
+      sessionStorage.removeItem("stockin_token");setAuthLoading(false)
+    })
   },[])
 
   useEffect(()=>{
@@ -2200,17 +2207,23 @@ export default function App() {
 
   // Camarero / legacy employee → full-page minimal layout (must be checked before login guard)
   const isCamarero=PERMS.isCamarero(role)
-  const handleLogout=async()=>{try{await authAPI.logout()}catch{}sessionStorage.removeItem("stockin_token");setUser(null);setView("dashboard");setProducts([]);setStocks([]);setSuppliers([]);setWarehouses([]);setAlbaranes([]);setTraspasos([]);setConnected(null)}
+  const handleLogout=async()=>{try{await authAPI.logout()}catch{}sessionStorage.removeItem("stockin_token");setUser(null);setSuspended(false);setView("dashboard");setProducts([]);setStocks([]);setSuppliers([]);setWarehouses([]);setAlbaranes([]);setTraspasos([]);setConnected(null)}
+
+  if(suspended) return <SuspendedScreen onLogout={handleLogout}/>
 
   if(!user) return <LoginScreen onLogin={async(u,p)=>{
     const d=await authAPI.login(u,p)
+    if(d.suspended){setSuspended(true);return}
     sessionStorage.setItem("stockin_token",d.token)
     setUser(d.user)
     const r=d.user?.role||"readonly"
+    if(r==="superadmin") return // SuperadminPanel rendered below
     if(configured){setView("dashboard");doSync(activeConn)}
-    else if(r==="superadmin") setView("setup")
     else setAgoraState("unconfigured")
   }}/>
+
+  // Superadmin → completely separate panel, never sees stock
+  if(role==="superadmin") return <SuperadminPanel user={user} onLogout={handleLogout}/>
 
   // Camarero full-page layout (no sidebar)
   if(isCamarero) return <CamareroPage
@@ -2307,21 +2320,16 @@ export default function App() {
           {notif&&<div style={{position:"fixed",top:16,right:16,zIndex:400,maxWidth:380,background:notif.type==="ok"?"#f0fdf8":notif.type==="warn"?"#fffbeb":"#fff5f5",border:`1px solid ${notif.type==="ok"?T.green:notif.type==="warn"?T.yellow:T.red}`,borderRadius:10,padding:"11px 16px",display:"flex",alignItems:"center",gap:10,color:notif.type==="ok"?T.green:notif.type==="warn"?T.yellow:T.red,fontSize:13,fontWeight:500,boxShadow:"0 4px 20px rgba(3,70,80,0.12)",animation:"slideIn 0.2s ease"}}>
             <Ic n={notif.type==="ok"?"check":"alert"} s={15}/>{notif.msg}
           </div>}
-          {/* Superadmin-only views */}
-          {view==="setup"&&PERMS.canSeeSetup(role)&&<SetupView connections={connections} activeId={activeId} onNew={()=>setModal("new-conn")} onEdit={(c)=>{setEditConn(c);setModal("edit-conn")}} onSwitch={switchConn} onDelete={deleteConn} toast={toast} autoSyncInterval={autoSyncInterval} onAutoSyncChange={handleAutoSyncChange} whatsappCfg={whatsappCfg} onWhatsappSave={handleWhatsappSave}/>}
-          {view==="usuarios"&&PERMS.canManageUsers(role)&&<UsersPanel currentUser={user} toast={toast}/>}
           {/* Admin-only: Mi equipo (Ágora employees mapped to StockIn roles) */}
           {view==="miequipo"&&PERMS.canManageTeam(role)&&<MiEquipoView conn={activeConn} toast={toast}/>}
           {/* Informe mensual */}
           {view==="informe"&&canSeeNav("informe")&&<MonthlyReport stockRows={stockRows} albaranes={albaranes} alertas={alertas} conn={activeConn} toast={toast}/>}
-          {/* Non-superadmin waiting screen when Ágora not configured */}
-          {view!=="setup"&&view!=="usuarios"&&view!=="miequipo"&&view!=="informe"&&agoraState==="unconfigured"&&role!=="superadmin"&&<WaitingScreen/>}
-          {/* Superadmin no connection */}
-          {view!=="setup"&&view!=="usuarios"&&view!=="miequipo"&&view!=="informe"&&!configured&&role==="superadmin"&&<NoConnection onSetup={()=>setView("setup")} onNew={()=>setModal("new-conn")}/>}
+          {/* Waiting screen when Ágora not configured (admin/encargado/camarero) */}
+          {view!=="miequipo"&&view!=="informe"&&agoraState==="unconfigured"&&<WaitingScreen/>}
           {/* Main modules — requires connection */}
-          {view!=="setup"&&view!=="usuarios"&&view!=="miequipo"&&view!=="informe"&&agoraState!=="unconfigured"&&configured&&<>
+          {view!=="miequipo"&&view!=="informe"&&agoraState!=="unconfigured"&&configured&&<>
             {syncing&&!products.length&&<LoadingScreen/>}
-            {!syncing&&connected===false&&!products.length&&!cachedAt&&role==="superadmin"&&<ErrorScreen error={syncErr} onRetry={()=>doSync()} onSetup={()=>setView("setup")}/>}
+            {!syncing&&connected===false&&!products.length&&!cachedAt&&<ErrorScreen error={syncErr} onRetry={()=>doSync()}/>}
             {(products.length>0||(connected===true&&!syncing)||cachedAt)&&<>
               {view==="dashboard"&&<Dashboard stockRows={stockRows} alertas={alertas} albaranes={albaranes} traspasos={traspasos} conn={activeConn} onNav={navigate} role={role}/>}
               {view==="alertas"&&<AlertasView stockRows={stockRows} alertas={alertas} warehouses={warehouses} onIrInventario={()=>navigate("regularizacion")} role={role}/>}

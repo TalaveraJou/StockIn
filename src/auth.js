@@ -88,3 +88,33 @@ export const emailAPI = {
   sendTest:    ()     => apiFetch('/email-config/test', { method: 'POST' }),
   getHistory:  ()     => apiFetch('/email-config/history'),
 }
+
+// ── Superadmin API ────────────────────────────────────────────────────────────
+export const saAPI = {
+  // Distributors
+  getDistributors:    ()        => apiFetch('/sa/distributors'),
+  getDistributor:     (id)      => apiFetch(`/sa/distributors/${id}`),
+  createDistributor:  (data)    => apiFetch('/sa/distributors',          { method: 'POST',   body: data }),
+  updateDistributor:  (id,data) => apiFetch(`/sa/distributors/${id}`,    { method: 'PUT',    body: data }),
+  deleteDistributor:  (id)      => apiFetch(`/sa/distributors/${id}`,    { method: 'DELETE' }),
+  suspendDistributor: (id)      => apiFetch(`/sa/distributors/${id}/suspend`,  { method: 'POST' }),
+  activateDistributor:(id)      => apiFetch(`/sa/distributors/${id}/activate`, { method: 'POST' }),
+  // Locations
+  getLocations:    (q='')       => apiFetch(`/sa/locations${q}`),
+  createLocation:  (data)       => apiFetch('/sa/locations',          { method: 'POST',   body: data }),
+  updateLocation:  (id,data)    => apiFetch(`/sa/locations/${id}`,    { method: 'PUT',    body: data }),
+  deleteLocation:  (id)         => apiFetch(`/sa/locations/${id}`,    { method: 'DELETE' }),
+  blockLocation:   (id)         => apiFetch(`/sa/locations/${id}/block`,   { method: 'POST' }),
+  unblockLocation: (id)         => apiFetch(`/sa/locations/${id}/unblock`, { method: 'POST' }),
+  // Users
+  getSaUsers:      (q='')       => apiFetch(`/sa/users${q}`),
+  createSaUser:    (data)       => apiFetch('/sa/users',          { method: 'POST',   body: data }),
+  updateSaUser:    (id,data)    => apiFetch(`/sa/users/${id}`,    { method: 'PUT',    body: data }),
+  deleteSaUser:    (id)         => apiFetch(`/sa/users/${id}`,    { method: 'DELETE' }),
+  forceLogout:     (id)         => apiFetch(`/sa/users/${id}/forcelogout`, { method: 'POST' }),
+  // Reports & Config
+  getMetrics:      ()           => apiFetch('/sa/reports/metrics'),
+  getEvents:       ()           => apiFetch('/sa/reports/events'),
+  getGlobalConfig: ()           => apiFetch('/sa/config'),
+  saveGlobalConfig:(data)       => apiFetch('/sa/config', { method: 'PUT', body: data }),
+}

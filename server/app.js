@@ -99,12 +99,43 @@ const logActivity = (userId, username, action, ip, details = {}) => {
   writeJSON('activity-log.json', log.slice(0, 1000))
 }
 
+// ── Suspension chain helper ───────────────────────────────────────────────────
+const checkSuspended = (userId) => {
+  const users     = readJSON('users.json')
+  const user      = users.find(u => u.id === userId)
+  if (!user || !user.active) return { invalid: true }
+  if (user.locationId) {
+    const locs = readJSON('locations.json')
+    const loc  = locs.find(l => l.id === user.locationId)
+    if (loc?.status === 'blocked') return { suspended: true }
+    if (loc?.distributorId) {
+      const dists = readJSON('distributors.json')
+      const dist  = dists.find(d => d.id === loc.distributorId)
+      if (dist?.status === 'suspended') return { suspended: true }
+    }
+  }
+  return { ok: true, user }
+}
+
 // ── Auth middleware ───────────────────────────────────────────────────────────
 const authMiddleware = (req, res, next) => {
   const token = req.headers.authorization?.replace('Bearer ', '')
   if (!token) return res.status(401).json({ error: 'Token requerido' })
-  try { req.user = jwt.verify(token, JWT_SECRET); next() }
-  catch { res.status(401).json({ error: 'Token inválido o expirado' }) }
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET)
+    if (decoded.id === 'superadmin') { req.user = decoded; return next() }
+
+    const check = checkSuspended(decoded.id)
+    if (check.invalid)   return res.status(401).json({ error: 'Usuario no encontrado o inactivo' })
+    if (check.suspended) return res.status(403).json({ error: 'Tu acceso a StockIn está temporalmente suspendido. Contacta con tu administrador.', suspended: true })
+
+    // Force logout check (forceLogoutAt in ms, iat in seconds)
+    const u = check.user
+    if (u.forceLogoutAt && decoded.iat < Math.floor(u.forceLogoutAt / 1000))
+      return res.status(401).json({ error: 'Sesión cerrada por el administrador' })
+
+    req.user = decoded; next()
+  } catch { res.status(401).json({ error: 'Token inválido o expirado' }) }
 }
 
 const adminOnly = (req, res, next) => {
@@ -167,6 +198,11 @@ app.post('/api/auth/login', async (req, res) => {
   const valid = await bcrypt.compare(password, user.passwordHash)
   if (!valid) return res.status(401).json({ error: 'Credenciales incorrectas' })
 
+  // Check suspension before granting access
+  const check = checkSuspended(user.id)
+  if (check.suspended)
+    return res.status(403).json({ error: 'Tu acceso a StockIn está temporalmente suspendido. Contacta con tu administrador.', suspended: true })
+
   user.lastLogin = new Date().toISOString()
   writeJSON('users.json', users)
 
@@ -192,7 +228,7 @@ app.get('/api/auth/me', authMiddleware, (req, res) => {
   const users = readJSON('users.json')
   const user  = users.find(u => u.id === req.user.id)
   if (!user || !user.active) return res.status(401).json({ error: 'Usuario no encontrado o inactivo' })
-  res.json({ id: user.id, username: user.username, role: user.role, fullName: user.fullName, lastLogin: user.lastLogin })
+  res.json({ id: user.id, username: user.username, role: user.role, fullName: user.fullName, lastLogin: user.lastLogin, locationId: user.locationId||null, distributorId: user.distributorId||null })
 })
 
 // ── USERS (superadmin only) ───────────────────────────────────────────────────
@@ -308,6 +344,322 @@ app.post('/api/email-config/test', authMiddleware, adminOnly, async (req, res) =
 
 app.get('/api/email-config/history', authMiddleware, adminOnly, (req, res) => {
   res.json(readJSON('email-config.json').history || [])
+})
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  SUPERADMIN API — /api/sa/*  (all routes require superadminOnly)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+const forceLogoutUsers = (userIds) => {
+  const users = readJSON('users.json')
+  const ts    = Date.now()
+  const updated = users.map(u => userIds.includes(u.id) ? { ...u, forceLogoutAt: ts } : u)
+  writeJSON('users.json', updated)
+}
+
+const usersOfLocations = (locationIds) => {
+  const users = readJSON('users.json')
+  return users.filter(u => locationIds.includes(u.locationId)).map(u => u.id)
+}
+
+// ── DISTRIBUTORS ──────────────────────────────────────────────────────────────
+app.get('/api/sa/distributors', authMiddleware, superadminOnly, (req, res) => {
+  const dists = readJSON('distributors.json')
+  const locs  = readJSON('locations.json')
+  const result = dists.map(d => ({
+    ...d,
+    locationsActive:  locs.filter(l => l.distributorId === d.id && l.status !== 'blocked').length,
+    locationsBlocked: locs.filter(l => l.distributorId === d.id && l.status === 'blocked').length,
+  }))
+  res.json(result)
+})
+
+app.get('/api/sa/distributors/:id', authMiddleware, superadminOnly, (req, res) => {
+  const dists = readJSON('distributors.json')
+  const dist  = dists.find(d => d.id === req.params.id)
+  if (!dist) return res.status(404).json({ error: 'Distribuidor no encontrado' })
+  const locs  = readJSON('locations.json').filter(l => l.distributorId === dist.id)
+  const users = readJSON('users.json').filter(u => u.distributorId === dist.id).map(u => ({
+    id: u.id, username: u.username, fullName: u.fullName, role: u.role,
+    active: u.active, lastLogin: u.lastLogin, locationId: u.locationId,
+  }))
+  const log   = readJSON('activity-log.json').filter(e => e.details?.distributorId === dist.id || users.some(u => u.id === e.userId)).slice(0, 20)
+  res.json({ ...dist, locations: locs, users, recentActivity: log })
+})
+
+app.post('/api/sa/distributors', authMiddleware, superadminOnly, async (req, res) => {
+  const { name, company, email, phone, password } = req.body
+  if (!name || !email || !password) return res.status(400).json({ error: 'Nombre, email y contraseña son obligatorios' })
+  const dists = readJSON('distributors.json')
+  if (dists.find(d => d.email === email)) return res.status(409).json({ error: 'Ya existe un distribuidor con ese email' })
+  const newDist = {
+    id: `dist_${Date.now()}`, name, company: company||'', email, phone: phone||'',
+    passwordHash: await bcrypt.hash(password, 10),
+    status: 'active', createdAt: new Date().toISOString(), notes: '',
+  }
+  dists.push(newDist)
+  writeJSON('distributors.json', dists)
+  const ip = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'unknown'
+  logActivity('superadmin', SUPERADMIN.username, 'CREATE_DISTRIBUTOR', ip, { distributor: name })
+  res.status(201).json(newDist)
+})
+
+app.put('/api/sa/distributors/:id', authMiddleware, superadminOnly, async (req, res) => {
+  const dists = readJSON('distributors.json')
+  const idx   = dists.findIndex(d => d.id === req.params.id)
+  if (idx === -1) return res.status(404).json({ error: 'Distribuidor no encontrado' })
+  const { name, company, email, phone, password, notes } = req.body
+  if (name    !== undefined) dists[idx].name    = name
+  if (company !== undefined) dists[idx].company = company
+  if (email   !== undefined) dists[idx].email   = email
+  if (phone   !== undefined) dists[idx].phone   = phone
+  if (notes   !== undefined) dists[idx].notes   = notes
+  if (password) dists[idx].passwordHash = await bcrypt.hash(password, 10)
+  writeJSON('distributors.json', dists)
+  res.json({ ok: true })
+})
+
+app.delete('/api/sa/distributors/:id', authMiddleware, superadminOnly, (req, res) => {
+  const dists  = readJSON('distributors.json')
+  const filtered = dists.filter(d => d.id !== req.params.id)
+  if (filtered.length === dists.length) return res.status(404).json({ error: 'Distribuidor no encontrado' })
+  writeJSON('distributors.json', filtered)
+  // Also delete their locations and users
+  const locs   = readJSON('locations.json').filter(l => l.distributorId !== req.params.id)
+  writeJSON('locations.json', locs)
+  const users  = readJSON('users.json').filter(u => u.distributorId !== req.params.id)
+  writeJSON('users.json', users)
+  logActivity('superadmin', SUPERADMIN.username, 'DELETE_DISTRIBUTOR', 'unknown', { distributorId: req.params.id })
+  res.json({ ok: true })
+})
+
+app.post('/api/sa/distributors/:id/suspend', authMiddleware, superadminOnly, (req, res) => {
+  const dists = readJSON('distributors.json')
+  const idx   = dists.findIndex(d => d.id === req.params.id)
+  if (idx === -1) return res.status(404).json({ error: 'Distribuidor no encontrado' })
+  dists[idx].status = 'suspended'
+  writeJSON('distributors.json', dists)
+  // Block all locations of this distributor and force-logout all their users
+  const locs  = readJSON('locations.json')
+  const blockedLocIds = locs.filter(l => l.distributorId === req.params.id).map(l => l.id)
+  locs.forEach(l => { if (l.distributorId === req.params.id) l.status = 'blocked' })
+  writeJSON('locations.json', locs)
+  forceLogoutUsers(usersOfLocations(blockedLocIds))
+  logActivity('superadmin', SUPERADMIN.username, 'SUSPEND_DISTRIBUTOR', 'unknown', { distributorId: req.params.id })
+  res.json({ ok: true })
+})
+
+app.post('/api/sa/distributors/:id/activate', authMiddleware, superadminOnly, (req, res) => {
+  const dists = readJSON('distributors.json')
+  const idx   = dists.findIndex(d => d.id === req.params.id)
+  if (idx === -1) return res.status(404).json({ error: 'Distribuidor no encontrado' })
+  dists[idx].status = 'active'
+  writeJSON('distributors.json', dists)
+  // Unblock all locations of this distributor
+  const locs = readJSON('locations.json')
+  locs.forEach(l => { if (l.distributorId === req.params.id && l.status === 'blocked') l.status = 'active' })
+  writeJSON('locations.json', locs)
+  logActivity('superadmin', SUPERADMIN.username, 'ACTIVATE_DISTRIBUTOR', 'unknown', { distributorId: req.params.id })
+  res.json({ ok: true })
+})
+
+// ── LOCATIONS ─────────────────────────────────────────────────────────────────
+app.get('/api/sa/locations', authMiddleware, superadminOnly, (req, res) => {
+  const locs  = readJSON('locations.json')
+  const dists = readJSON('distributors.json')
+  const { distributorId, connectionStatus, status } = req.query
+  let result  = locs
+  if (distributorId)    result = result.filter(l => l.distributorId === distributorId)
+  if (connectionStatus) result = result.filter(l => l.connectionStatus === connectionStatus)
+  if (status)           result = result.filter(l => l.status === status)
+  result = result.map(l => ({
+    ...l,
+    distributorName: dists.find(d => d.id === l.distributorId)?.name || '—',
+  }))
+  res.json(result)
+})
+
+app.post('/api/sa/locations', authMiddleware, superadminOnly, (req, res) => {
+  const { distributorId, name, agoraUrl, apiToken } = req.body
+  if (!distributorId || !name) return res.status(400).json({ error: 'Distribuidor y nombre son obligatorios' })
+  const locs = readJSON('locations.json')
+  const newLoc = {
+    id: `loc_${Date.now()}`, distributorId, name,
+    agoraUrl: agoraUrl||'', apiToken: apiToken||'',
+    status: 'active', connectionStatus: 'unconfigured',
+    lastSync: null, createdAt: new Date().toISOString(),
+  }
+  locs.push(newLoc)
+  writeJSON('locations.json', locs)
+  logActivity('superadmin', SUPERADMIN.username, 'CREATE_LOCATION', 'unknown', { name, distributorId })
+  res.status(201).json(newLoc)
+})
+
+app.put('/api/sa/locations/:id', authMiddleware, superadminOnly, (req, res) => {
+  const locs = readJSON('locations.json')
+  const idx  = locs.findIndex(l => l.id === req.params.id)
+  if (idx === -1) return res.status(404).json({ error: 'Local no encontrado' })
+  const { name, agoraUrl, apiToken, connectionStatus, lastSync } = req.body
+  if (name             !== undefined) locs[idx].name             = name
+  if (agoraUrl         !== undefined) locs[idx].agoraUrl         = agoraUrl
+  if (apiToken         !== undefined) locs[idx].apiToken         = apiToken
+  if (connectionStatus !== undefined) locs[idx].connectionStatus = connectionStatus
+  if (lastSync         !== undefined) locs[idx].lastSync         = lastSync
+  writeJSON('locations.json', locs)
+  res.json({ ok: true })
+})
+
+app.delete('/api/sa/locations/:id', authMiddleware, superadminOnly, (req, res) => {
+  const locs     = readJSON('locations.json')
+  const filtered = locs.filter(l => l.id !== req.params.id)
+  if (filtered.length === locs.length) return res.status(404).json({ error: 'Local no encontrado' })
+  writeJSON('locations.json', filtered)
+  // Also remove users of this location
+  const users = readJSON('users.json').filter(u => u.locationId !== req.params.id)
+  writeJSON('users.json', users)
+  res.json({ ok: true })
+})
+
+app.post('/api/sa/locations/:id/block', authMiddleware, superadminOnly, (req, res) => {
+  const locs = readJSON('locations.json')
+  const idx  = locs.findIndex(l => l.id === req.params.id)
+  if (idx === -1) return res.status(404).json({ error: 'Local no encontrado' })
+  locs[idx].status = 'blocked'
+  writeJSON('locations.json', locs)
+  forceLogoutUsers(usersOfLocations([req.params.id]))
+  logActivity('superadmin', SUPERADMIN.username, 'BLOCK_LOCATION', 'unknown', { locationId: req.params.id, name: locs[idx].name })
+  res.json({ ok: true })
+})
+
+app.post('/api/sa/locations/:id/unblock', authMiddleware, superadminOnly, (req, res) => {
+  const locs = readJSON('locations.json')
+  const idx  = locs.findIndex(l => l.id === req.params.id)
+  if (idx === -1) return res.status(404).json({ error: 'Local no encontrado' })
+  locs[idx].status = 'active'
+  writeJSON('locations.json', locs)
+  logActivity('superadmin', SUPERADMIN.username, 'UNBLOCK_LOCATION', 'unknown', { locationId: req.params.id })
+  res.json({ ok: true })
+})
+
+// ── SA USERS ──────────────────────────────────────────────────────────────────
+app.get('/api/sa/users', authMiddleware, superadminOnly, (req, res) => {
+  const users = readJSON('users.json')
+  const dists = readJSON('distributors.json')
+  const locs  = readJSON('locations.json')
+  const { search, distributorId, locationId } = req.query
+  let result  = users
+  if (distributorId) result = result.filter(u => u.distributorId === distributorId)
+  if (locationId)    result = result.filter(u => u.locationId    === locationId)
+  if (search)        result = result.filter(u => u.username.includes(search) || u.fullName?.toLowerCase().includes(search.toLowerCase()))
+  res.json(result.map(u => ({
+    id: u.id, username: u.username, fullName: u.fullName, role: u.role,
+    active: u.active, lastLogin: u.lastLogin, createdAt: u.createdAt,
+    distributorId: u.distributorId||null, locationId: u.locationId||null,
+    distributorName: dists.find(d => d.id === u.distributorId)?.name || '—',
+    locationName:    locs.find(l => l.id === u.locationId)?.name    || '—',
+  })))
+})
+
+app.post('/api/sa/users', authMiddleware, superadminOnly, async (req, res) => {
+  const { username, password, fullName, role, distributorId, locationId } = req.body
+  if (!username || !password || !fullName || !role) return res.status(400).json({ error: 'Todos los campos obligatorios son requeridos' })
+  const users = readJSON('users.json')
+  if (users.find(u => u.username === username)) return res.status(409).json({ error: 'El email / usuario ya existe' })
+  const newUser = {
+    id: `user_${Date.now()}`, username, passwordHash: await bcrypt.hash(password, 10),
+    fullName, role, distributorId: distributorId||null, locationId: locationId||null,
+    active: true, createdAt: new Date().toISOString(), lastLogin: null,
+  }
+  users.push(newUser)
+  writeJSON('users.json', users)
+  logActivity('superadmin', SUPERADMIN.username, 'CREATE_USER', 'unknown', { username, role })
+  res.status(201).json({ ...newUser, passwordHash: undefined })
+})
+
+app.put('/api/sa/users/:id', authMiddleware, superadminOnly, async (req, res) => {
+  const users = readJSON('users.json')
+  const idx   = users.findIndex(u => u.id === req.params.id)
+  if (idx === -1) return res.status(404).json({ error: 'Usuario no encontrado' })
+  const { fullName, role, active, password, distributorId, locationId } = req.body
+  if (fullName      !== undefined) users[idx].fullName      = fullName
+  if (role          !== undefined) users[idx].role          = role
+  if (active        !== undefined) users[idx].active        = active
+  if (distributorId !== undefined) users[idx].distributorId = distributorId
+  if (locationId    !== undefined) users[idx].locationId    = locationId
+  if (password) users[idx].passwordHash = await bcrypt.hash(password, 10)
+  writeJSON('users.json', users)
+  res.json({ ok: true })
+})
+
+app.delete('/api/sa/users/:id', authMiddleware, superadminOnly, (req, res) => {
+  const users    = readJSON('users.json')
+  const filtered = users.filter(u => u.id !== req.params.id)
+  if (filtered.length === users.length) return res.status(404).json({ error: 'Usuario no encontrado' })
+  writeJSON('users.json', filtered)
+  res.json({ ok: true })
+})
+
+app.post('/api/sa/users/:id/forcelogout', authMiddleware, superadminOnly, (req, res) => {
+  const users = readJSON('users.json')
+  const idx   = users.findIndex(u => u.id === req.params.id)
+  if (idx === -1) return res.status(404).json({ error: 'Usuario no encontrado' })
+  users[idx].forceLogoutAt = Date.now()
+  writeJSON('users.json', users)
+  logActivity('superadmin', SUPERADMIN.username, 'FORCE_LOGOUT', 'unknown', { userId: req.params.id })
+  res.json({ ok: true })
+})
+
+// ── SA REPORTS ────────────────────────────────────────────────────────────────
+app.get('/api/sa/reports/metrics', authMiddleware, superadminOnly, (req, res) => {
+  const dists = readJSON('distributors.json')
+  const locs  = readJSON('locations.json')
+  const users = readJSON('users.json')
+  res.json({
+    distributors: {
+      total:     dists.length,
+      active:    dists.filter(d => d.status === 'active').length,
+      suspended: dists.filter(d => d.status === 'suspended').length,
+    },
+    locations: {
+      total:   locs.length,
+      active:  locs.filter(l => l.status !== 'blocked').length,
+      blocked: locs.filter(l => l.status === 'blocked').length,
+      syncing: locs.filter(l => l.connectionStatus === 'active').length,
+      failing: locs.filter(l => l.connectionStatus === 'failing').length,
+    },
+    users: {
+      total:  users.length,
+      active: users.filter(u => u.active).length,
+    },
+  })
+})
+
+app.get('/api/sa/reports/events', authMiddleware, superadminOnly, (req, res) => {
+  const log = readJSON('activity-log.json').slice(0, 50)
+  res.json(log)
+})
+
+// ── GLOBAL CONFIG ─────────────────────────────────────────────────────────────
+app.get('/api/sa/config', authMiddleware, superadminOnly, (req, res) => {
+  const cfg  = readJSON('global-config.json')
+  const safe = { ...cfg }
+  if (safe.email?.smtp?.pass) safe.email = { ...safe.email, smtp: { ...safe.email.smtp, pass: '••••••••' } }
+  if (safe.whatsapp?.apikey)  safe.whatsapp = { ...safe.whatsapp, apikey: '••••••••' }
+  res.json(safe)
+})
+
+app.put('/api/sa/config', authMiddleware, superadminOnly, (req, res) => {
+  const current = readJSON('global-config.json')
+  const update  = req.body
+  // Don't overwrite masked values
+  if (update.email?.smtp?.pass === '••••••••') update.email.smtp.pass = current.email?.smtp?.pass || ''
+  if (update.whatsapp?.apikey === '••••••••') update.whatsapp.apikey = current.whatsapp?.apikey || ''
+  writeJSON('global-config.json', { ...current, ...update,
+    email: { ...current.email, ...update.email, smtp: { ...current.email?.smtp, ...update.email?.smtp } },
+    whatsapp: { ...current.whatsapp, ...update.whatsapp },
+  })
+  res.json({ ok: true })
 })
 
 export default app
