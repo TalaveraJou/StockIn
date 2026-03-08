@@ -54,8 +54,10 @@ const DEFAULT_USERS = [
 ]
 
 // En Vercel (readonly FS) los datos viven en memoria durante la ejecución
-let _memUsers = null
-let _memLog   = []
+let _memUsers        = null
+let _memLog          = []
+let _memDistributors = null
+let _memLocations    = null
 
 const isWritable = (dir) => {
   try { mkdirSync(dir, { recursive: true }); return true } catch { return false }
@@ -70,7 +72,9 @@ const getDataDir = () => {
 }
 
 const readJSON = (file) => {
-  if (file === 'users.json' && _memUsers) return _memUsers
+  if (file === 'users.json'        && _memUsers)        return _memUsers
+  if (file === 'distributors.json' && _memDistributors) return _memDistributors
+  if (file === 'locations.json'    && _memLocations)    return _memLocations
   const dir  = getDataDir()
   const path = join(dir, file)
   if (!existsSync(path)) {
@@ -81,13 +85,17 @@ const readJSON = (file) => {
 }
 
 const writeJSON = (file, data) => {
-  if (file === 'users.json') _memUsers = data
+  if (file === 'users.json')        _memUsers        = data
+  if (file === 'distributors.json') _memDistributors = data
+  if (file === 'locations.json')    _memLocations    = data
   try {
     const dir = getDataDir()
     writeFileSync(join(dir, file), JSON.stringify(data, null, 2))
   } catch {
     // In truly read-only environments keep only in memory
-    if (file === 'users.json') _memUsers = data
+    if (file === 'users.json')        _memUsers        = data
+    if (file === 'distributors.json') _memDistributors = data
+    if (file === 'locations.json')    _memLocations    = data
     if (file === 'activity-log.json') _memLog = data
   }
 }
