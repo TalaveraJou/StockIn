@@ -539,6 +539,24 @@ app.post('/api/sa/locations/:id/unblock', authMiddleware, superadminOnly, (req, 
   res.json({ ok: true })
 })
 
+// ── AGORA PROXY — employees for a given location ─────────────────────────────
+app.get('/api/sa/locations/:id/employees', authMiddleware, superadminOnly, async (req, res) => {
+  const locs = readJSON('locations.json')
+  const loc  = locs.find(l => l.id === req.params.id)
+  if (!loc) return res.status(404).json({ error: 'Local no encontrado' })
+  if (!loc.agoraUrl || !loc.apiToken) return res.status(400).json({ error: 'Este local no tiene configurada la conexión con Ágora' })
+  try {
+    const url  = `${loc.agoraUrl.replace(/\/$/,'')}/api/export-master/?filter=Employees`
+    const resp = await fetch(url, { headers: { 'Api-Token': loc.apiToken, 'Accept': 'application/json' }, signal: AbortSignal.timeout(10000) })
+    if (!resp.ok) throw new Error(`Ágora respondió con HTTP ${resp.status}`)
+    const data = await resp.json()
+    const employees = data?.Employees || data?.employees || []
+    res.json(employees)
+  } catch (e) {
+    res.status(502).json({ error: e.message || 'No se pudo conectar con Ágora' })
+  }
+})
+
 // ── SA USERS ──────────────────────────────────────────────────────────────────
 app.get('/api/sa/users', authMiddleware, superadminOnly, (req, res) => {
   const users = readJSON('users.json')
@@ -559,7 +577,7 @@ app.get('/api/sa/users', authMiddleware, superadminOnly, (req, res) => {
 })
 
 app.post('/api/sa/users', authMiddleware, superadminOnly, async (req, res) => {
-  const { username, password, fullName, role, active, distributorId, locationId } = req.body
+  const { username, password, fullName, role, active, distributorId, locationId, agoraEmployeeId, agoraEmployeeName } = req.body
   if (!username || !password || !fullName || !role)
     return res.status(400).json({ error: 'Nombre, email, contraseña y rol son obligatorios' })
   const users = readJSON('users.json')
@@ -569,9 +587,11 @@ app.post('/api/sa/users', authMiddleware, superadminOnly, async (req, res) => {
     id: `user_${Date.now()}`, username,
     passwordHash: await bcrypt.hash(password, 10),
     fullName, role,
-    distributorId: distributorId || null,
-    locationId:    locationId    || null,
-    active:        active !== false,   // respects form toggle; defaults to true
+    distributorId:    distributorId    || null,
+    locationId:       locationId       || null,
+    agoraEmployeeId:  agoraEmployeeId  || null,
+    agoraEmployeeName:agoraEmployeeName|| null,
+    active:        active !== false,
     createdAt: new Date().toISOString(), lastLogin: null,
   }
   users.push(newUser)
@@ -584,12 +604,14 @@ app.put('/api/sa/users/:id', authMiddleware, superadminOnly, async (req, res) =>
   const users = readJSON('users.json')
   const idx   = users.findIndex(u => u.id === req.params.id)
   if (idx === -1) return res.status(404).json({ error: 'Usuario no encontrado' })
-  const { fullName, role, active, password, distributorId, locationId } = req.body
-  if (fullName      !== undefined) users[idx].fullName      = fullName
-  if (role          !== undefined) users[idx].role          = role
-  if (active        !== undefined) users[idx].active        = active
-  if (distributorId !== undefined) users[idx].distributorId = distributorId
-  if (locationId    !== undefined) users[idx].locationId    = locationId
+  const { fullName, role, active, password, distributorId, locationId, agoraEmployeeId, agoraEmployeeName } = req.body
+  if (fullName           !== undefined) users[idx].fullName           = fullName
+  if (role               !== undefined) users[idx].role               = role
+  if (active             !== undefined) users[idx].active             = active
+  if (distributorId      !== undefined) users[idx].distributorId      = distributorId
+  if (locationId         !== undefined) users[idx].locationId         = locationId
+  if (agoraEmployeeId    !== undefined) users[idx].agoraEmployeeId    = agoraEmployeeId
+  if (agoraEmployeeName  !== undefined) users[idx].agoraEmployeeName  = agoraEmployeeName
   if (password) users[idx].passwordHash = await bcrypt.hash(password, 10)
   writeJSON('users.json', users)
   res.json({ ok: true })

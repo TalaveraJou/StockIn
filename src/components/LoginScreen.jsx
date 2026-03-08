@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Eye, EyeOff } from 'lucide-react'
 import { DEMO_USER_LIST, DEMO_CREDENTIALS } from '../mockData.js'
 
 const T = {
@@ -141,8 +142,8 @@ export default function LoginScreen({ onLogin }) {
                 <button type="button" onClick={() => setShowPw(s => !s)} style={{
                   position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
                   background: 'none', border: 'none', cursor: 'pointer',
-                  color: T.muted, fontSize: 11, fontFamily: 'inherit', fontWeight: 600,
-                }}>{showPw ? 'ocultar' : 'ver'}</button>
+                  color: T.muted, display: 'flex', alignItems: 'center',
+                }}>{showPw ? <EyeOff size={16}/> : <Eye size={16}/>}</button>
               </div>
             </div>
 

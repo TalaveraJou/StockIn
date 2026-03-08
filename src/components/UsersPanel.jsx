@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { Eye, EyeOff } from 'lucide-react'
 import { usersAPI } from '../auth.js'
 
 const T = {
@@ -108,8 +109,8 @@ function UserForm({ initial, onSave, onCancel }) {
           <button
             type="button"
             onClick={() => setShowPw(s => !s)}
-            style={{ position:'absolute', right:10, top:'50%', transform:'translateY(-50%)', background:'none', border:'none', cursor:'pointer', color:T.muted, fontSize:11, fontFamily:'inherit', fontWeight:600 }}
-          >{showPw ? 'ocultar' : 'ver'}</button>
+            style={{ position:'absolute', right:10, top:'50%', transform:'translateY(-50%)', background:'none', border:'none', cursor:'pointer', color:T.muted, display:'flex', alignItems:'center' }}
+          >{showPw ? <EyeOff size={16}/> : <Eye size={16}/>}</button>
         </div>
       </div>
       <div>

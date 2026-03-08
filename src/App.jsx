@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react"
+import { LayoutDashboard, Package, Bell, ClipboardList, FileText, ArrowLeftRight, ShoppingCart, History, Truck, Settings, BarChart2, Users, Building2, ScrollText, LogOut, ChevronLeft, ChevronRight, Plus, Pencil, Trash2, Eye, EyeOff, Search, Filter, Download, Upload, RefreshCw, Check, X, AlertTriangle, CheckCircle, XCircle, Info, Wifi, WifiOff, Loader2, Camera, Smartphone, Mail, Lock, Shield, Clock, TrendingUp, Warehouse, Menu, ChevronDown, Link2, SlidersHorizontal, Euro, Box } from 'lucide-react'
 import LoginScreen from "./components/LoginScreen.jsx"
 import UsersPanel from "./components/UsersPanel.jsx"
 import MonthlyReport from "./components/MonthlyReport.jsx"
@@ -106,41 +107,49 @@ const S = {
 }
 const thSt = {padding:"9px 14px",textAlign:"left",fontSize:10,fontWeight:700,color:T.muted,textTransform:"uppercase",letterSpacing:"0.06em",borderBottom:`1px solid ${T.border}`,whiteSpace:"nowrap"}
 
-const IC = {
-  dashboard:"M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z",
-  stock:"M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 14l-5-5 1.41-1.41L12 14.17l7.59-7.59L21 8l-9 9z",
-  albaran:"M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z",
-  transfer:"M6.99 11L3 15l3.99 4v-3H14v-2H6.99v-3zM21 9l-3.99-4v3H10v2h7.01v3L21 9z",
-  proveedor:"M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z",
-  settings:"M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.57 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z",
-  sync:"M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z",
-  alert:"M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z",
-  plus:"M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z",
-  check:"M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z",
-  close:"M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z",
-  search:"M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z",
-  camera:"M12 15.2A3.2 3.2 0 0 1 8.8 12 3.2 3.2 0 0 1 12 8.8 3.2 3.2 0 0 1 15.2 12 3.2 3.2 0 0 1 12 15.2M9 2L7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2h-3.17L15 2H9z",
-  upload:"M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z",
-  euro:"M15 18.5c-2.51 0-4.68-1.42-5.76-3.5H15v-2H8.58c-.05-.33-.08-.66-.08-1s.03-.67.08-1H15V9H9.24C10.32 6.92 12.5 5.5 15 5.5c1.61 0 3.08.59 4.23 1.57L21 5.3C19.41 3.87 17.3 3 15 3c-3.92 0-7.24 2.51-8.48 6H3v2h3.06c-.04.33-.06.66-.06 1s.02.67.06 1H3v2h3.52c1.24 3.49 4.56 6 8.48 6 2.31 0 4.41-.87 6-2.3l-1.78-1.77c-1.14.98-2.6 1.57-4.22 1.57z",
-  warehouse:"M20 8h-3V4H3c-1.1 0-2 .9-2 2v11h2c0 1.66 1.34 3 3 3s3-1.34 3-3h6c0 1.66 1.34 3 3 3s3-1.34 3-3h2v-5l-3-4z",
-  menu:"M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z",
-  chevron:"M16.59 8.59L12 13.17 7.41 8.59 6 10l6 6 6-6z",
-  trash:"M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z",
-  link:"M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1 0 1.71-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z",
-  info:"M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z",
-  box:"M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4",
-  adjust:"M3 17v2h6v-2H3zM3 5v2h10V5H3zm10 16v-2h8v-2h-8v-2h-2v6h2zM7 9v2H3v2h4v2h2V9H7zm14 4v-2H11v2h10zm-6-4h2V7h4V5h-4V3h-2v6z",
-  cart:"M7 18c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2zm10 0c-1.1 0-1.99.9-1.99 2s.89 2 1.99 2 2-.9 2-2-.9-2-2-2zm-1.45-5c.75 0 1.41-.41 1.75-1.03l3.58-6.49A1 1 0 0 0 20 4H5.21L4.27 2H1v2h2l3.6 7.59-1.35 2.44C4.52 15.37 5.48 17 7 17h12v-2H7.42c-.14 0-.25-.11-.25-.25z",
-  history:"M13 3a9 9 0 1 0 0 18A9 9 0 0 0 13 3zM11 8h2v5l4.25 2.52-.77 1.28L12 14V8zM7 1L1 7l6 6V9h2.08A10 10 0 0 0 3 19h2a8 8 0 0 1 8-8V7H9V5h4V1H7z",
-  users:"M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z",
-  mail:"M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z",
-  logout:"M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z",
+const IC_LUCIDE = {
+  dashboard:    LayoutDashboard,
+  stock:        Package,
+  albaran:      FileText,
+  transfer:     ArrowLeftRight,
+  proveedor:    Truck,
+  settings:     Settings,
+  sync:         RefreshCw,
+  alert:        AlertTriangle,
+  plus:         Plus,
+  check:        Check,
+  close:        X,
+  search:       Search,
+  camera:       Camera,
+  upload:       Upload,
+  euro:         Euro,
+  warehouse:    Warehouse,
+  menu:         Menu,
+  chevron:      ChevronDown,
+  trash:        Trash2,
+  link:         Link2,
+  info:         Info,
+  box:          Box,
+  adjust:       SlidersHorizontal,
+  cart:         ShoppingCart,
+  history:      History,
+  users:        Users,
+  mail:         Mail,
+  logout:       LogOut,
+  eye:          Eye,
+  eyeoff:       EyeOff,
+  bell:         Bell,
+  barChart:     BarChart2,
+  building:     Building2,
+  pencil:       Pencil,
+  loader:       Loader2,
+  wifi:         Wifi,
+  wifiOff:      WifiOff,
 }
-const Ic = ({n,s=18,spin:sp}) => (
-  <svg width={s} height={s} viewBox="0 0 24 24" fill="currentColor" style={{flexShrink:0,...(sp?{animation:"spin 1s linear infinite"}:{})}}>
-    <path d={IC[n]||IC.dashboard}/>
-  </svg>
-)
+const Ic = ({n,s=18,spin:sp,style:sx={}}) => {
+  const Icon = IC_LUCIDE[n] || LayoutDashboard
+  return <Icon size={s} style={{flexShrink:0,...(sp?{animation:"spin 1s linear infinite"}:{}),...sx}}/>
+}
 
 // ── SHARED UI ─────────────────────────────────────────────────────────────────
 function Badge({color,label,dot}) {
@@ -219,7 +228,7 @@ function AccountSettingsModal({user,role,onClose,toast,onUpdateUser}) {
               <Field key={key} label={label}>
                 <div style={{position:"relative"}}>
                   <input style={S.inp} type={showPw?"text":"password"} value={pw[key]} onChange={e=>setPw(p=>({...p,[key]:e.target.value}))} placeholder="••••••••" />
-                  {key==="next"&&<button type="button" onClick={()=>setShowPw(s=>!s)} style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:T.muted,fontSize:11,fontWeight:600,fontFamily:"inherit"}}>{showPw?"ocultar":"ver"}</button>}
+                  {key==="next"&&<button type="button" onClick={()=>setShowPw(s=>!s)} style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:T.muted,display:"flex",alignItems:"center"}}>{showPw?<EyeOff size={16}/>:<Eye size={16}/>}</button>}
                 </div>
               </Field>
             ))}
@@ -324,7 +333,7 @@ function ConnectionForm({initial,onSave,onCancel,toast}) {
         <Field label="API Token" hint="Monitor Ágora → Herramientas → Activar Módulos Adicionales → API HTTP">
           <div style={{position:"relative"}}>
             <input type={showToken?"text":"password"} value={f.apiToken} onChange={e=>{setF(p=>({...p,apiToken:e.target.value}));setTestResult(null)}} placeholder="gtSUwbHbxwg3hRXhZ01Kictq" style={{...S.inp,paddingRight:40}}/>
-            <button onClick={()=>setShowToken(s=>!s)} style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:T.muted,fontSize:11,fontFamily:"inherit"}}>{showToken?"ocultar":"ver"}</button>
+            <button onClick={()=>setShowToken(s=>!s)} style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:T.muted,display:"flex",alignItems:"center"}}>{showToken?<EyeOff size={16}/>:<Eye size={16}/>}</button>
           </div>
         </Field>
         <Field label="URL del servidor Ágora" hint="Debe comenzar con http:// o https://. Puerto por defecto: 8984.">
@@ -2088,6 +2097,7 @@ export default function App() {
 
   const activeConn=connections.find(c=>c.id===activeId)||null
   const configured=!!(activeConn?.apiToken)
+  const isDemo=!!(user&&isDemoUser(user.username))
   const role=user?.role||"readonly"
   const canSeeNav=(id)=>(NAV_ACCESS[role]||[]).includes(id)
 
@@ -2372,7 +2382,7 @@ export default function App() {
     {id:"traspasos",     label:"Traspasos",      icon:"transfer"},
     {id:"productos",     label:"Productos",      icon:"box"},
     {id:"proveedores",   label:"Proveedores",    icon:"proveedor"},
-    {id:"informe",       label:"Informe mensual",icon:"mail"},
+    {id:"informe",       label:"Informe mensual",icon:"barChart"},
     {id:"miequipo",      label:"Mi equipo",      icon:"users"},
     {id:"usuarios",      label:"Usuarios",       icon:"users"},
     {id:"setup",         label:"Configuración",  icon:"settings",badge:!configured?"!":null,bc:T.yellow},
@@ -2395,6 +2405,7 @@ export default function App() {
     setUser(d.user)
     const r=d.user?.role||"readonly"
     if(r==="superadmin") return // SuperadminPanel rendered below
+    if(isDemoUser(d.user.username)) return // useEffect handles demo data loading
     if(configured){setView("dashboard");doSync(activeConn)}
     else setAgoraState("unconfigured")
   }}/>
@@ -2503,11 +2514,11 @@ export default function App() {
           {view==="informe"&&canSeeNav("informe")&&<MonthlyReport stockRows={stockRows} albaranes={albaranes} alertas={alertas} conn={activeConn} toast={toast}/>}
           {/* Waiting screen when Ágora not configured (admin/encargado/camarero) */}
           {view!=="miequipo"&&view!=="informe"&&agoraState==="unconfigured"&&<WaitingScreen/>}
-          {/* Main modules — requires connection */}
-          {view!=="miequipo"&&view!=="informe"&&agoraState!=="unconfigured"&&configured&&<>
-            {syncing&&!products.length&&<LoadingScreen/>}
-            {!syncing&&connected===false&&!products.length&&!cachedAt&&<ErrorScreen error={syncErr} onRetry={()=>doSync()}/>}
-            {(products.length>0||(connected===true&&!syncing)||cachedAt)&&<>
+          {/* Main modules — requires connection (or demo mode) */}
+          {view!=="miequipo"&&view!=="informe"&&agoraState!=="unconfigured"&&(configured||isDemo)&&<>
+            {!isDemo&&syncing&&!products.length&&<LoadingScreen/>}
+            {!isDemo&&!syncing&&connected===false&&!products.length&&!cachedAt&&<ErrorScreen error={syncErr} onRetry={()=>doSync()}/>}
+            {(products.length>0||(connected===true&&!syncing)||cachedAt||isDemo)&&<>
               {view==="dashboard"&&<Dashboard stockRows={stockRows} alertas={alertas} albaranes={albaranes} traspasos={traspasos} conn={activeConn} onNav={navigate} role={role}/>}
               {view==="alertas"&&<AlertasView stockRows={stockRows} alertas={alertas} warehouses={warehouses} onIrInventario={()=>navigate("regularizacion")} role={role}/>}
               {view==="stock"&&<StockView stockRows={stockRows} warehouses={warehouses} role={role} albaranes={albaranes}/>}
