@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Building2, MapPin, Users, BarChart2, Settings, Plus, Pencil, Trash2, X, Search, LogOut, Eye, EyeOff, Check, AlertTriangle, ArrowLeft, Mail, RefreshCw, ChevronRight } from 'lucide-react'
+import { Building2, MapPin, Users, BarChart2, Settings, Plus, Pencil, Trash2, X, Search, LogOut, Eye, EyeOff, Check, AlertTriangle, ArrowLeft, Mail, RefreshCw, ChevronRight, Wifi, WifiOff, Loader2 } from 'lucide-react'
 import { saAPI } from '../auth.js'
 
 // ── Theme ─────────────────────────────────────────────────────────────────────
@@ -37,6 +37,9 @@ const IC_LUCIDE_SA = {
   eye:         Eye,
   eyeoff:      EyeOff,
   chevron:     ChevronRight,
+  wifi:        Wifi,
+  wifiOff:     WifiOff,
+  loader:      Loader2,
 }
 const Ic = ({ n, s = 18, style: sx = {} }) => {
   const Icon = IC_LUCIDE_SA[n] || Settings
@@ -350,8 +353,32 @@ function DistribuidoresModule({ toast }) {
 // ═══════════════════════════════════════════════════════════════════════════════
 function LocationForm({ initial, distributors, onSave, onCancel, saving }) {
   const [form, setForm] = useState({ name: '', city: '', distributorId: '', notes: '', agoraUrl: '', apiToken: '', ...initial })
-  const [showToken, setShowToken] = useState(false)
-  const set = (k, v) => setForm(p => ({ ...p, [k]: v }))
+  const [showToken,   setShowToken]   = useState(false)
+  const [connStatus,  setConnStatus]  = useState(null) // null | 'loading' | 'ok' | 'error'
+  const [connMsg,     setConnMsg]     = useState('')
+  const set = (k, v) => { setForm(p => ({ ...p, [k]: v })); if (k === 'agoraUrl' || k === 'apiToken') { setConnStatus(null); setConnMsg('') } }
+
+  const testConn = async () => {
+    if (!form.agoraUrl || !form.apiToken) return
+    setConnStatus('loading'); setConnMsg('')
+    try {
+      const r = await saAPI.testAgoraConnection({ agoraUrl: form.agoraUrl, apiToken: form.apiToken })
+      if (r.ok) { setConnStatus('ok'); setConnMsg(`Conexión OK — ${r.employeesCount} empleado${r.employeesCount !== 1 ? 's' : ''} encontrados`) }
+      else       { setConnStatus('error'); setConnMsg(r.error || 'Error desconocido') }
+    } catch (e) { setConnStatus('error'); setConnMsg(e.message || 'Error de conexión') }
+  }
+
+  const connBanner = connStatus && (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 8, fontSize: 12, fontWeight: 500,
+      background: connStatus === 'ok' ? `${T.green}12` : connStatus === 'error' ? `${T.red}12` : `${T.muted}12`,
+      color: connStatus === 'ok' ? T.green : connStatus === 'error' ? T.red : T.muted,
+      border: `1px solid ${connStatus === 'ok' ? T.green : connStatus === 'error' ? T.red : T.muted}30`,
+    }}>
+      {connStatus === 'loading' ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : connStatus === 'ok' ? <Wifi size={13}/> : <WifiOff size={13}/>}
+      {connStatus === 'loading' ? 'Verificando conexión con Ágora…' : connMsg}
+    </div>
+  )
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <Field label="Nombre del local *"><input style={S.inp} value={form.name} onChange={e => set('name', e.target.value)} placeholder="Bar Ejemplo" /></Field>
@@ -371,13 +398,20 @@ function LocationForm({ initial, distributors, onSave, onCancel, saving }) {
             <input style={S.inp} value={form.agoraUrl} onChange={e => set('agoraUrl', e.target.value)} placeholder="http://192.168.1.10:8984" />
           </Field>
           <Field label="API Token de Ágora">
-            <div style={{ position: 'relative' }}>
-              <input style={{ ...S.inp, paddingRight: 40 }} type={showToken ? 'text' : 'password'} value={form.apiToken} onChange={e => set('apiToken', e.target.value)} placeholder="Token de Ágora" />
-              <button type="button" onClick={() => setShowToken(s => !s)} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: T.muted, display: 'flex', alignItems: 'center' }}>
-                {showToken ? <EyeOff size={16}/> : <Eye size={16}/>}
-              </button>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <div style={{ position: 'relative', flex: 1 }}>
+                <input style={{ ...S.inp, paddingRight: 40 }} type={showToken ? 'text' : 'password'} value={form.apiToken} onChange={e => set('apiToken', e.target.value)} placeholder="Token de Ágora" />
+                <button type="button" onClick={() => setShowToken(s => !s)} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: T.muted, display: 'flex', alignItems: 'center' }}>
+                  {showToken ? <EyeOff size={16}/> : <Eye size={16}/>}
+                </button>
+              </div>
+              <Btn variant="secondary" onClick={testConn} disabled={!form.agoraUrl || !form.apiToken || connStatus === 'loading'} style={{ whiteSpace: 'nowrap', flexShrink: 0 }}>
+                {connStatus === 'loading' ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }}/> : <Wifi size={13}/>}
+                Verificar
+              </Btn>
             </div>
           </Field>
+          {connBanner}
         </div>
       </div>
       <Field label="Notas"><textarea style={{ ...S.inp, minHeight: 60, resize: 'vertical' }} value={form.notes} onChange={e => set('notes', e.target.value)} placeholder="Notas internas…" /></Field>
@@ -454,21 +488,20 @@ function LocalesModule({ toast }) {
       />
 
       {/* Filters */}
-      <div style={{ display: 'flex', gap: 10, marginBottom: 20, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 10, marginBottom: 20, flexWrap: 'wrap', alignItems: 'center' }}>
         <div style={{ position: 'relative', flex: '1 1 200px', minWidth: 160 }}>
-          <Ic n="search" s={14} />
           <input
-            style={{ ...S.inp, paddingLeft: 32 }}
+            style={{ ...S.inp, paddingLeft: 32, height: 38, boxSizing: 'border-box' }}
             value={search} onChange={e => setSearch(e.target.value)}
             placeholder="Buscar local o ciudad…"
           />
           <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: T.muted, pointerEvents: 'none', display: 'flex' }}><Ic n="search" s={14} /></span>
         </div>
-        <select style={{ ...S.inp, width: 'auto', flex: '0 1 180px' }} value={filterDist} onChange={e => setFilterDist(e.target.value)}>
+        <select style={{ ...S.inp, width: 'auto', flex: '0 1 180px', height: 38, boxSizing: 'border-box' }} value={filterDist} onChange={e => setFilterDist(e.target.value)}>
           <option value="">Todos los distribuidores</option>
           {distributors.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
         </select>
-        <select style={{ ...S.inp, width: 'auto', flex: '0 1 140px' }} value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
+        <select style={{ ...S.inp, width: 'auto', flex: '0 1 140px', height: 38, boxSizing: 'border-box' }} value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
           <option value="">Todos los estados</option>
           <option value="active">Activo</option>
           <option value="blocked">Bloqueado</option>
@@ -486,18 +519,30 @@ function LocalesModule({ toast }) {
                 <th style={thSt}>Ciudad</th>
                 <th style={thSt}>Distribuidor</th>
                 <th style={thSt}>Estado</th>
+                <th style={thSt}>Ágora</th>
                 <th style={thSt} />
               </tr>
             </thead>
             <tbody>
               {filtered.map(loc => {
                 const dist = distributors.find(d => d.id === loc.distributorId)
+                const connColor = loc.connectionStatus === 'active' ? T.green : loc.connectionStatus === 'error' ? T.red : T.muted
+                const connLabel = loc.connectionStatus === 'active' ? 'Conectado' : loc.connectionStatus === 'error' ? 'Error' : 'Sin config.'
                 return (
                   <tr key={loc.id} style={{ background: '#fff' }}>
                     <td style={tdSt}><span style={{ fontWeight: 600 }}>{loc.name}</span></td>
                     <td style={tdSt}><span style={{ color: T.muted }}>{loc.city || '—'}</span></td>
                     <td style={tdSt}><span style={{ color: T.muted }}>{dist?.name || '—'}</span></td>
                     <td style={tdSt}><Badge color={loc.status === 'blocked' ? T.red : T.green} label={loc.status === 'blocked' ? 'Bloqueado' : 'Activo'} /></td>
+                    <td style={tdSt}>
+                      {loc.agoraUrl
+                        ? <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                            {loc.connectionStatus === 'active' ? <Wifi size={13} style={{ color: T.green }} /> : <WifiOff size={13} style={{ color: connColor }} />}
+                            <Badge color={connColor} label={connLabel} />
+                          </div>
+                        : <span style={{ color: T.muted, fontSize: 12 }}>—</span>
+                      }
+                    </td>
                     <td style={{ ...tdSt, textAlign: 'right' }}>
                       <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
                         <Btn small variant="secondary" onClick={() => { setEditing(loc); setModal('form') }}><Ic n="edit" s={12} /></Btn>

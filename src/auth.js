@@ -107,6 +107,7 @@ export const saAPI = {
   blockLocation:       (id)      => apiFetch(`/sa/locations/${id}/block`,     { method: 'POST' }),
   unblockLocation:     (id)      => apiFetch(`/sa/locations/${id}/unblock`,   { method: 'POST' }),
   getLocationEmployees:(id)      => apiFetch(`/sa/locations/${id}/employees`),
+  testAgoraConnection: (data)    => apiFetch('/sa/locations/test-agora', { method: 'POST', body: data }),
   // Users
   getSaUsers:      (q='')       => apiFetch(`/sa/users${q}`),
   createSaUser:    (data)       => apiFetch('/sa/users',          { method: 'POST',   body: data }),
