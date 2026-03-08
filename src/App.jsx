@@ -203,10 +203,10 @@ function AccountSettingsModal({user,role,onClose,toast,onUpdateUser}) {
     if(pw.next&&pw.next!==pw.confirm){toast("Las contraseñas no coinciden","err");return}
     setSaving(true)
     try{
-      const {usersAPI}=await import("./auth.js")
+      const {authAPI}=await import("./auth.js")
       const body={fullName:form.fullName,phone:form.phone}
       if(pw.next&&pw.current) body.currentPassword=pw.current,body.newPassword=pw.next
-      await usersAPI.update(user.id,body)
+      await authAPI.updateProfile(body)
       onUpdateUser({fullName:form.fullName,phone:form.phone,changelogSub})
       toast("Cuenta actualizada ✓")
       onClose()

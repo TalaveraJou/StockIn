@@ -288,6 +288,30 @@ app.get('/api/auth/me', authMiddleware, (req, res) => {
   res.json({ id: user.id, username: user.username, role: user.role, fullName: user.fullName, lastLogin: user.lastLogin, locationId: user.locationId||null, distributorId: user.distributorId||null })
 })
 
+// ── SELF-SERVICE PROFILE (any authenticated user can update their own profile) ─
+app.put('/api/auth/profile', authMiddleware, async (req, res) => {
+  if (req.user.id === 'superadmin')
+    return res.status(400).json({ error: 'El superadmin no puede editar su perfil aquí' })
+
+  const users = readJSON('users.json')
+  const idx   = users.findIndex(u => u.id === req.user.id)
+  if (idx === -1) return res.status(404).json({ error: 'Usuario no encontrado' })
+
+  const { fullName, phone, currentPassword, newPassword } = req.body
+  if (fullName !== undefined) users[idx].fullName = fullName
+  if (phone    !== undefined) users[idx].phone    = phone
+
+  if (newPassword) {
+    if (!currentPassword) return res.status(400).json({ error: 'Debes indicar la contraseña actual' })
+    const valid = await bcrypt.compare(currentPassword, users[idx].passwordHash)
+    if (!valid) return res.status(401).json({ error: 'Contraseña actual incorrecta' })
+    users[idx].passwordHash = await bcrypt.hash(newPassword, 10)
+  }
+
+  writeJSON('users.json', users)
+  res.json({ ok: true, fullName: users[idx].fullName })
+})
+
 // ── USERS (superadmin only) ───────────────────────────────────────────────────
 app.get('/api/users', authMiddleware, superadminOnly, (req, res) => {
   const users = readJSON('users.json').map(u => ({

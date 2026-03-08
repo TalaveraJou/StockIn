@@ -69,9 +69,10 @@ const apiFetch = (path, opts = {}) => {
 }
 
 export const authAPI = {
-  login:   (username, password) => apiFetch('/auth/login', { method: 'POST', body: { username, password } }),
-  logout:  ()                   => apiFetch('/auth/logout', { method: 'POST' }),
-  me:      ()                   => apiFetch('/auth/me'),
+  login:         (username, password) => apiFetch('/auth/login', { method: 'POST', body: { username, password } }),
+  logout:        ()                   => apiFetch('/auth/logout', { method: 'POST' }),
+  me:            ()                   => apiFetch('/auth/me'),
+  updateProfile: (data)               => apiFetch('/auth/profile', { method: 'PUT', body: data }),
 }
 
 export const usersAPI = {
