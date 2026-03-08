@@ -262,14 +262,14 @@ function DistributorDetail({ dist, onBack, toast }) {
       {loading ? <div style={{ color: T.muted, fontSize: 13, padding: 20 }}>Cargando…</div> : (
         tab === 'locales' ? (
           locations.length === 0 ? <Empty msg="No hay locales para este distribuidor." /> : (
-            <div className="sa-table-wrap" style={{ ...S.card, padding: 0, overflowX: 'auto' }}>
-              <table className="sa-table" style={{ width: '100%', borderCollapse: 'collapse', minWidth: 520 }}>
-                <thead><tr><th style={thSt}>Local</th><th style={thSt}>Ciudad</th><th style={thSt}>Estado</th><th style={thSt} /></tr></thead>
+            <div className="sa-table-wrap" style={{ ...S.card, padding: 0 }}>
+              <table className="sa-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead><tr><th style={thSt}>Local</th><th className="sa-hide-xs" style={thSt}>Ciudad</th><th style={thSt}>Estado</th><th style={thSt} /></tr></thead>
                 <tbody>
                   {locations.map(loc => (
                     <tr key={loc.id} style={{ background: '#fff' }}>
                       <td style={tdSt}><span style={{ fontWeight: 600 }}>{loc.name}</span></td>
-                      <td style={tdSt}><span style={{ color: T.muted }}>{loc.city || '—'}</span></td>
+                      <td className="sa-hide-xs" style={tdSt}><span style={{ color: T.muted }}>{loc.city || '—'}</span></td>
                       <td style={tdSt}><Badge color={loc.status === 'blocked' ? T.red : T.green} label={loc.status === 'blocked' ? 'Bloqueado' : 'Activo'} /></td>
                       <td style={{ ...tdSt, textAlign: 'right' }}>
                         <Btn small variant={loc.status === 'blocked' ? 'success' : 'warn'} onClick={() => handleBlock(loc)}>
@@ -284,15 +284,15 @@ function DistributorDetail({ dist, onBack, toast }) {
           )
         ) : (
           users.length === 0 ? <Empty msg="No hay usuarios para este distribuidor." /> : (
-            <div className="sa-table-wrap" style={{ ...S.card, padding: 0, overflowX: 'auto' }}>
-              <table className="sa-table" style={{ width: '100%', borderCollapse: 'collapse', minWidth: 520 }}>
-                <thead><tr><th style={thSt}>Usuario</th><th style={thSt}>Rol</th><th style={thSt}>Local</th><th style={thSt} /></tr></thead>
+            <div className="sa-table-wrap" style={{ ...S.card, padding: 0 }}>
+              <table className="sa-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead><tr><th style={thSt}>Usuario</th><th style={thSt}>Rol</th><th className="sa-hide-xs" style={thSt}>Local</th><th style={thSt} /></tr></thead>
                 <tbody>
                   {users.map(u => (
                     <tr key={u.id}>
                       <td style={tdSt}><div style={{ fontWeight: 600 }}>{u.fullName}</div><div style={{ fontSize: 11, color: T.muted }}>{u.username}</div></td>
                       <td style={tdSt}><Badge color={T.accent} label={u.role} /></td>
-                      <td style={tdSt}><span style={{ color: T.muted }}>{u.locationName || '—'}</span></td>
+                      <td className="sa-hide-xs" style={tdSt}><span style={{ color: T.muted }}>{u.locationName || '—'}</span></td>
                       <td style={{ ...tdSt, textAlign: 'right' }}>
                         <Btn small variant="danger" onClick={() => handleForceLogout(u)}><Ic n="logout" s={12} />Cerrar sesión</Btn>
                       </td>
@@ -649,13 +649,13 @@ function LocalesModule({ toast }) {
       {loading ? <div style={{ color: T.muted, fontSize: 13 }}>Cargando…</div> : filtered.length === 0 ? (
         <Empty msg={items.length === 0 ? 'No hay locales registrados.' : 'No hay resultados para los filtros aplicados.'} />
       ) : (
-        <div className="sa-table-wrap" style={{ ...S.card, padding: 0, overflowX: 'auto' }}>
-          <table className="sa-table" style={{ width: '100%', borderCollapse: 'collapse', minWidth: 520 }}>
+        <div className="sa-table-wrap" style={{ ...S.card, padding: 0 }}>
+          <table className="sa-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr>
                 <th style={thSt}>Local</th>
-                <th style={thSt}>Ciudad</th>
-                <th style={thSt}>Distribuidor</th>
+                <th className="sa-hide-xs" style={thSt}>Ciudad</th>
+                <th className="sa-hide-xs" style={thSt}>Distribuidor</th>
                 <th style={thSt}>Estado</th>
                 <th style={thSt}>Ágora</th>
                 <th style={thSt} />
@@ -670,10 +670,10 @@ function LocalesModule({ toast }) {
                 return (
                   <tr key={loc.id} style={{ background: '#fff' }}>
                     <td style={tdSt}><span style={{ fontWeight: 600 }}>{loc.name}</span></td>
-                    <td style={tdSt}><span style={{ color: T.muted }}>{loc.city || '—'}</span></td>
-                    <td style={tdSt}><span style={{ color: T.muted }}>{dist?.name || '—'}</span></td>
+                    <td className="sa-hide-xs" style={tdSt}><span style={{ color: T.muted }}>{loc.city || '—'}</span></td>
+                    <td className="sa-hide-xs" style={tdSt}><span style={{ color: T.muted }}>{dist?.name || '—'}</span></td>
                     <td style={tdSt}><Badge color={loc.status === 'blocked' ? T.red : T.green} label={loc.status === 'blocked' ? 'Bloqueado' : 'Activo'} /></td>
-                    <td style={{ ...tdSt, minWidth: 180 }}>
+                    <td style={tdSt}>
                       {loc.agoraUrl ? (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
@@ -1004,14 +1004,14 @@ function UsuariosModule({ toast }) {
       {loading ? <div style={{ color: T.muted, fontSize: 13 }}>Cargando…</div> : filtered.length === 0 ? (
         <Empty msg={items.length === 0 ? 'No hay usuarios registrados.' : 'No hay resultados.'} />
       ) : (
-        <div className="sa-table-wrap" style={{ ...S.card, padding: 0, overflowX: 'auto' }}>
-          <table className="sa-table" style={{ width: '100%', borderCollapse: 'collapse', minWidth: 520 }}>
+        <div className="sa-table-wrap" style={{ ...S.card, padding: 0 }}>
+          <table className="sa-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr>
                 <th style={thSt}>Usuario</th>
                 <th style={thSt}>Rol</th>
-                <th style={thSt}>Distribuidor</th>
-                <th style={thSt}>Local</th>
+                <th className="sa-hide-xs" style={thSt}>Distribuidor</th>
+                <th className="sa-hide-xs" style={thSt}>Local</th>
                 <th style={thSt}>Estado</th>
                 <th style={thSt} />
               </tr>
@@ -1027,8 +1027,8 @@ function UsuariosModule({ toast }) {
                       <div style={{ fontSize: 11, color: T.muted }}>{u.username}</div>
                     </td>
                     <td style={tdSt}><Badge color={ROLE_COLORS[u.role] || T.muted} label={ROLE_LABELS[u.role] || u.role} /></td>
-                    <td style={tdSt}><span style={{ color: T.muted }}>{dist?.name || '—'}</span></td>
-                    <td style={tdSt}><span style={{ color: T.muted }}>{loc?.name || u.locationName || '—'}</span></td>
+                    <td className="sa-hide-xs" style={tdSt}><span style={{ color: T.muted }}>{dist?.name || '—'}</span></td>
+                    <td className="sa-hide-xs" style={tdSt}><span style={{ color: T.muted }}>{loc?.name || u.locationName || '—'}</span></td>
                     <td style={tdSt}><Badge color={u.active !== false ? T.green : T.red} label={u.active !== false ? 'Activo' : 'Inactivo'} /></td>
                     <td style={{ ...tdSt, textAlign: 'right' }}>
                       <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
@@ -1121,13 +1121,13 @@ function InformesModule({ toast }) {
 
       <h2 style={{ fontSize: 16, fontWeight: 700, color: T.brand, marginBottom: 14 }}>Registro de actividad</h2>
       {events.length === 0 ? <Empty msg="No hay eventos registrados." /> : (
-        <div className="sa-table-wrap" style={{ ...S.card, padding: 0, overflowX: 'auto' }}>
-          <table className="sa-table" style={{ width: '100%', borderCollapse: 'collapse', minWidth: 520 }}>
+        <div className="sa-table-wrap" style={{ ...S.card, padding: 0 }}>
+          <table className="sa-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr>
                 <th style={thSt}>Fecha</th>
                 <th style={thSt}>Tipo</th>
-                <th style={thSt}>Actor</th>
+                <th className="sa-hide-xs" style={thSt}>Actor</th>
                 <th style={thSt}>Detalle</th>
               </tr>
             </thead>
@@ -1143,8 +1143,8 @@ function InformesModule({ toast }) {
                       label={ev.type || 'info'}
                     />
                   </td>
-                  <td style={tdSt}><span style={{ color: T.muted }}>{ev.actor || '—'}</span></td>
-                  <td style={{ ...tdSt, maxWidth: 360, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ev.detail || '—'}</td>
+                  <td className="sa-hide-xs" style={tdSt}><span style={{ color: T.muted }}>{ev.actor || '—'}</span></td>
+                  <td style={{ ...tdSt, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ev.detail || '—'}</td>
                 </tr>
               ))}
             </tbody>
@@ -1566,6 +1566,8 @@ export default function SuperadminPanel({ user, onLogout }) {
           input,select,textarea{font-size:16px !important}
           /* Tap target size */
           .sa-btn{min-height:40px !important}
+          /* Hide secondary columns on mobile */
+          .sa-hide-xs{display:none !important}
         }
         @media(max-width:479px){
           .sa-content{padding:12px 12px 80px !important}

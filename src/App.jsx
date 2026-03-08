@@ -778,7 +778,13 @@ function AlertasView({stockRows,alertas,warehouses,onIrInventario,role}) {
         {current.length===0?<Empty msg="Sin alertas en esta categoría" icon="check"/>:
         <table className="app-table" style={{width:"100%",borderCollapse:"collapse"}}>
           <thead><tr>
-            {["Producto","Familia","Almacén","Stock actual","Mín","Máx","Diferencia"].map(h=><th key={h} style={thSt}>{h}</th>)}
+            <th style={thSt}>Producto</th>
+            <th className="hide-xs" style={thSt}>Familia</th>
+            <th className="hide-xs" style={thSt}>Almacén</th>
+            <th style={thSt}>Stock</th>
+            <th className="hide-xs" style={thSt}>Mín</th>
+            <th className="hide-xs" style={thSt}>Máx</th>
+            <th style={thSt}>Diferencia</th>
           </tr></thead>
           <tbody>
           {current.map((r,i)=>{
@@ -786,11 +792,11 @@ function AlertasView({stockRows,alertas,warehouses,onIrInventario,role}) {
             const clr=tab==="agotados"?T.red:tab==="bajoMin"?T.orange:T.yellow
             return <tr key={i} style={{background:i%2?"#f8fbfb":"#fff"}}>
               <td style={{padding:"9px 14px",fontSize:13,fontWeight:600,color:T.text}}>{r.prod?.Name||r.ProductId}</td>
-              <td style={{padding:"9px 14px",fontSize:12,color:T.muted}}>{r.prod?.FamilyName||"—"}</td>
-              <td style={{padding:"9px 14px",fontSize:12,color:T.muted}}>{r.whName}</td>
+              <td className="hide-xs" style={{padding:"9px 14px",fontSize:12,color:T.muted}}>{r.prod?.FamilyName||"—"}</td>
+              <td className="hide-xs" style={{padding:"9px 14px",fontSize:12,color:T.muted}}>{r.whName}</td>
               <td style={{padding:"9px 14px"}}><span style={{fontWeight:700,color:clr}}>{r.Quantity}</span></td>
-              <td style={{padding:"9px 14px",fontSize:12,color:T.muted}}>{r.minStock||"—"}</td>
-              <td style={{padding:"9px 14px",fontSize:12,color:T.muted}}>{r.maxStock||"—"}</td>
+              <td className="hide-xs" style={{padding:"9px 14px",fontSize:12,color:T.muted}}>{r.minStock||"—"}</td>
+              <td className="hide-xs" style={{padding:"9px 14px",fontSize:12,color:T.muted}}>{r.maxStock||"—"}</td>
               <td style={{padding:"9px 14px"}}><span style={{color:clr,fontWeight:700,fontSize:12}}>+{diff}</span></td>
             </tr>
           })}
@@ -880,8 +886,8 @@ function StockView({stockRows,warehouses,role,albaranes}) {
           {families.map(f=><option key={f} value={f}>{f}</option>)}
         </select>
       </div>
-      <div style={{...S.card,padding:0,overflow:"auto"}}>
-        <table className="app-table" style={{width:"100%",borderCollapse:"collapse",minWidth:700}}>
+      <div style={{...S.card,padding:0}}>
+        <table className="app-table app-table-card" style={{width:"100%",borderCollapse:"collapse"}}>
           <thead><tr>
             <Th col="prod">Producto</Th>
             <th style={thSt}>Ref</th>
@@ -891,7 +897,7 @@ function StockView({stockRows,warehouses,role,albaranes}) {
             <Th col="qty">Stock</Th>
             <th style={thSt}>Mín</th>
             <th style={thSt}>Máx</th>
-            <Th col="dias">Días restantes</Th>
+            <Th col="dias">Días rest.</Th>
             {seePrices&&<th style={thSt}>P. Coste</th>}
             <th style={thSt}>P. Venta</th>
           </tr></thead>
@@ -901,20 +907,20 @@ function StockView({stockRows,warehouses,role,albaranes}) {
             const dias=diasRestantes(r)
             const stockClr=r.Quantity<=0?T.red:r.minStock>0&&r.Quantity<r.minStock?T.orange:r.maxStock>0&&r.Quantity>r.maxStock?T.yellow:T.green
             return <tr key={i} style={{background:i%2?"#f8fbfb":"#fff",borderBottom:`1px solid ${T.border}`}}>
-              <td style={{padding:"9px 14px",fontSize:13,fontWeight:600,color:T.text,maxWidth:220,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.prod?.Name||r.ProductId}</td>
-              <td style={{padding:"9px 14px",fontSize:11,color:T.muted,fontFamily:"monospace"}}>{r.prod?.Reference||"—"}</td>
-              <td style={{padding:"9px 14px",fontSize:12,color:T.muted}}>{r.prod?.FamilyName||"—"}</td>
-              <td style={{padding:"9px 14px",fontSize:12,color:T.muted}}>{r.whName}</td>
-              <td style={{padding:"9px 14px",fontSize:12,color:T.muted}}>{r.loc||"—"}</td>
-              <td style={{padding:"9px 14px"}}><span style={{fontWeight:700,color:stockClr}}>{r.Quantity}</span></td>
-              <td style={{padding:"9px 14px",fontSize:12,color:T.muted}}>{r.minStock||"—"}</td>
-              <td style={{padding:"9px 14px",fontSize:12,color:T.muted}}>{r.maxStock||"—"}</td>
-              <td style={{padding:"9px 14px"}}>{dias!==null
+              <td data-label="Producto" style={{padding:"9px 14px",fontSize:13,fontWeight:600,color:T.text}}>{r.prod?.Name||r.ProductId}</td>
+              <td data-label="Ref" style={{padding:"9px 14px",fontSize:11,color:T.muted,fontFamily:"monospace"}}>{r.prod?.Reference||"—"}</td>
+              <td data-label="Familia" style={{padding:"9px 14px",fontSize:12,color:T.muted}}>{r.prod?.FamilyName||"—"}</td>
+              <td data-label="Almacén" style={{padding:"9px 14px",fontSize:12,color:T.muted}}>{r.whName}</td>
+              <td data-label="Ubicación" style={{padding:"9px 14px",fontSize:12,color:T.muted}}>{r.loc||"—"}</td>
+              <td data-label="Stock" style={{padding:"9px 14px"}}><span style={{fontWeight:700,color:stockClr}}>{r.Quantity}</span></td>
+              <td data-label="Mín" style={{padding:"9px 14px",fontSize:12,color:T.muted}}>{r.minStock||"—"}</td>
+              <td data-label="Máx" style={{padding:"9px 14px",fontSize:12,color:T.muted}}>{r.maxStock||"—"}</td>
+              <td data-label="Días rest." style={{padding:"9px 14px"}}>{dias!==null
                 ?<span style={{fontWeight:700,color:diasColor(dias),fontSize:12}}>{dias}d</span>
                 :<span style={{color:T.muted,fontSize:12}}>—</span>
               }</td>
-              {seePrices&&<td style={{padding:"9px 14px",fontSize:12,color:T.muted}}>{r.costPrice!=null?`€${fmt(r.costPrice)}`:"—"}</td>}
-              <td style={{padding:"9px 14px",fontSize:12,color:T.muted}}>{r.salePrice!=null?`€${fmt(r.salePrice)}`:"—"}</td>
+              {seePrices&&<td data-label="P. Coste" style={{padding:"9px 14px",fontSize:12,color:T.muted}}>{r.costPrice!=null?`€${fmt(r.costPrice)}`:"—"}</td>}
+              <td data-label="P. Venta" style={{padding:"9px 14px",fontSize:12,color:T.muted}}>{r.salePrice!=null?`€${fmt(r.salePrice)}`:"—"}</td>
             </tr>
           })}
           </tbody>
@@ -1340,11 +1346,16 @@ function HistoricoView({albaranes,traspasos,warehouses}) {
         </div>
       </div>
 
-      {tab==="albaranes"&&<div style={{...S.card,padding:0,overflow:"auto"}}>
+      {tab==="albaranes"&&<div style={{...S.card,padding:0}}>
         {filtAlb.length===0?<Empty msg="Sin albaranes" icon="albaran"/>:
-        <table className="app-table" style={{width:"100%",borderCollapse:"collapse",minWidth:600}}>
+        <table className="app-table" style={{width:"100%",borderCollapse:"collapse"}}>
           <thead><tr>
-            {["Fecha","Proveedor","Almacén","Líneas","Total","Estado"].map(h=><th key={h} style={thSt}>{h}</th>)}
+            <th style={thSt}>Fecha</th>
+            <th style={thSt}>Proveedor</th>
+            <th className="hide-xs" style={thSt}>Almacén</th>
+            <th className="hide-xs" style={thSt}>Líneas</th>
+            <th style={thSt}>Total</th>
+            <th style={thSt}>Estado</th>
           </tr></thead>
           <tbody>
           {filtAlb.map((a,i)=>{
@@ -1352,8 +1363,8 @@ function HistoricoView({albaranes,traspasos,warehouses}) {
             return <tr key={i} style={{background:i%2?"#f8fbfb":"#fff",borderBottom:`1px solid ${T.border}`}}>
               <td style={{padding:"9px 14px",fontSize:12,color:T.muted,whiteSpace:"nowrap"}}>{fmtDate(a.Date)}</td>
               <td style={{padding:"9px 14px",fontSize:13,fontWeight:600,color:T.text}}>{a.Supplier?.Name||a.SupplierId||"—"}</td>
-              <td style={{padding:"9px 14px",fontSize:12,color:T.muted}}>{a.Warehouse?.Name||wh(a.WarehouseId)||"—"}</td>
-              <td style={{padding:"9px 14px",fontSize:12,color:T.muted}}>{(a.Lines||[]).length}</td>
+              <td className="hide-xs" style={{padding:"9px 14px",fontSize:12,color:T.muted}}>{a.Warehouse?.Name||wh(a.WarehouseId)||"—"}</td>
+              <td className="hide-xs" style={{padding:"9px 14px",fontSize:12,color:T.muted}}>{(a.Lines||[]).length}</td>
               <td style={{padding:"9px 14px",fontSize:12,fontWeight:600}}>€{fmt(total)}</td>
               <td style={{padding:"9px 14px"}}><StatusBadge status={a.Status}/></td>
             </tr>
@@ -1362,19 +1373,23 @@ function HistoricoView({albaranes,traspasos,warehouses}) {
         </table>}
       </div>}
 
-      {tab==="traspasos"&&<div style={{...S.card,padding:0,overflow:"auto"}}>
+      {tab==="traspasos"&&<div style={{...S.card,padding:0}}>
         {filtTr.length===0?<Empty msg="Sin traspasos" icon="transfer"/>:
-        <table className="app-table" style={{width:"100%",borderCollapse:"collapse",minWidth:500}}>
+        <table className="app-table" style={{width:"100%",borderCollapse:"collapse"}}>
           <thead><tr>
-            {["Fecha","Origen","Destino","Líneas","Estado"].map(h=><th key={h} style={thSt}>{h}</th>)}
+            <th style={thSt}>Fecha</th>
+            <th style={thSt}>Origen</th>
+            <th className="hide-xs" style={thSt}>Destino</th>
+            <th className="hide-xs" style={thSt}>Líneas</th>
+            <th style={thSt}>Estado</th>
           </tr></thead>
           <tbody>
           {filtTr.map((t,i)=>(
             <tr key={i} style={{background:i%2?"#f8fbfb":"#fff",borderBottom:`1px solid ${T.border}`}}>
               <td style={{padding:"9px 14px",fontSize:12,color:T.muted,whiteSpace:"nowrap"}}>{fmtDate(t.TransferDate||t._date)}</td>
               <td style={{padding:"9px 14px",fontSize:13,fontWeight:600,color:T.text}}>{wh(t.SourceWarehouseId)}</td>
-              <td style={{padding:"9px 14px",fontSize:13,fontWeight:600,color:T.accent}}>{wh(t.TargetWarehouseId)}</td>
-              <td style={{padding:"9px 14px",fontSize:12,color:T.muted}}>{(t.Lines||[]).length}</td>
+              <td className="hide-xs" style={{padding:"9px 14px",fontSize:13,fontWeight:600,color:T.accent}}>{wh(t.TargetWarehouseId)}</td>
+              <td className="hide-xs" style={{padding:"9px 14px",fontSize:12,color:T.muted}}>{(t.Lines||[]).length}</td>
               <td style={{padding:"9px 14px"}}>{t._local?<Badge color={T.yellow} label="Local"/>:<StatusBadge status={t.Status}/>}</td>
             </tr>
           ))}
@@ -1547,19 +1562,23 @@ function AlbaranesView({albaranes,products,suppliers,warehouses,conn,onImportar,
         <Ic n="search" s={14} style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",color:T.muted,pointerEvents:"none"}}/>
         <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Buscar por proveedor…" style={{...S.inp,paddingLeft:34,maxWidth:360}}/>
       </div>
-      <div style={{...S.card,padding:0,overflow:"auto"}}>
+      <div style={{...S.card,padding:0}}>
         {filtered.length===0?<Empty msg="Sin albaranes" icon="albaran"/>:
-        <table className="app-table" style={{width:"100%",borderCollapse:"collapse",minWidth:580}}>
+        <table className="app-table" style={{width:"100%",borderCollapse:"collapse"}}>
           <thead><tr>
-            {["Fecha","Proveedor","Almacén","Líneas","Estado"].map(h=><th key={h} style={thSt}>{h}</th>)}
+            <th style={thSt}>Fecha</th>
+            <th style={thSt}>Proveedor</th>
+            <th className="hide-xs" style={thSt}>Almacén</th>
+            <th className="hide-xs" style={thSt}>Líneas</th>
+            <th style={thSt}>Estado</th>
           </tr></thead>
           <tbody>
           {filtered.map((a,i)=>(
             <tr key={i} style={{background:i%2?"#f8fbfb":"#fff",borderBottom:`1px solid ${T.border}`}}>
               <td style={{padding:"9px 14px",fontSize:12,color:T.muted,whiteSpace:"nowrap"}}>{fmtDate(a.Date)}</td>
               <td style={{padding:"9px 14px",fontSize:13,fontWeight:600,color:T.text}}>{a.Supplier?.Name||a.SupplierId||"—"}</td>
-              <td style={{padding:"9px 14px",fontSize:12,color:T.muted}}>{a.Warehouse?.Name||`Almacén ${a.WarehouseId}`||"—"}</td>
-              <td style={{padding:"9px 14px",fontSize:12,color:T.muted}}>{(a.Lines||[]).length}</td>
+              <td className="hide-xs" style={{padding:"9px 14px",fontSize:12,color:T.muted}}>{a.Warehouse?.Name||`Almacén ${a.WarehouseId}`||"—"}</td>
+              <td className="hide-xs" style={{padding:"9px 14px",fontSize:12,color:T.muted}}>{(a.Lines||[]).length}</td>
               <td style={{padding:"9px 14px"}}><StatusBadge status={a.Status}/></td>
             </tr>
           ))}
@@ -1796,24 +1815,24 @@ function ProductosView({products,warehouses,suppliers,conn,onSave,toast,role,sup
         <Ic n="search" s={14} style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",color:T.muted,pointerEvents:"none"}}/>
         <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Buscar por nombre o referencia…" style={{...S.inp,paddingLeft:34,maxWidth:400}}/>
       </div>
-      <div style={{...S.card,padding:0,overflow:"auto"}}>
+      <div style={{...S.card,padding:0}}>
         {filtered.length===0?<Empty msg="Sin productos" icon="box"/>:
-        <table className="app-table" style={{width:"100%",borderCollapse:"collapse",minWidth:520}}>
+        <table className="app-table" style={{width:"100%",borderCollapse:"collapse"}}>
           <thead><tr>
             <th style={thSt}>Producto</th>
-            <th style={thSt}>Ref</th>
-            <th style={thSt}>Familia</th>
-            {seePrices&&<th style={thSt}>P. Coste</th>}
+            <th className="hide-xs" style={thSt}>Ref</th>
+            <th className="hide-xs" style={thSt}>Familia</th>
+            {seePrices&&<th className="hide-xs" style={thSt}>P. Coste</th>}
             <th style={thSt}>P. Venta</th>
             <th style={thSt}></th>
           </tr></thead>
           <tbody>
           {filtered.map((p,i)=>(
             <tr key={p.Id} style={{background:i%2?"#f8fbfb":"#fff",borderBottom:`1px solid ${T.border}`}}>
-              <td style={{padding:"9px 14px",fontSize:13,fontWeight:600,color:T.text,maxWidth:260,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.Name}</td>
-              <td style={{padding:"9px 14px",fontSize:11,color:T.muted,fontFamily:"monospace"}}>{p.Reference||"—"}</td>
-              <td style={{padding:"9px 14px",fontSize:12,color:T.muted}}>{p.FamilyName||"—"}</td>
-              {seePrices&&<td style={{padding:"9px 14px",fontSize:12,color:T.muted}}>€{fmt(p.CostPrice??0)}</td>}
+              <td style={{padding:"9px 14px",fontSize:13,fontWeight:600,color:T.text}}>{p.Name}</td>
+              <td className="hide-xs" style={{padding:"9px 14px",fontSize:11,color:T.muted,fontFamily:"monospace"}}>{p.Reference||"—"}</td>
+              <td className="hide-xs" style={{padding:"9px 14px",fontSize:12,color:T.muted}}>{p.FamilyName||"—"}</td>
+              {seePrices&&<td className="hide-xs" style={{padding:"9px 14px",fontSize:12,color:T.muted}}>€{fmt(p.CostPrice??0)}</td>}
               <td style={{padding:"9px 14px",fontSize:12,color:T.muted}}>€{fmt(p.Prices?.[0]?.Price??0)}</td>
               <td style={{padding:"9px 14px"}}><Btn small variant="secondary" onClick={()=>edit(p)}><Ic n="settings" s={12}/>Editar</Btn></td>
             </tr>
@@ -2580,12 +2599,47 @@ export default function App() {
           .sidebar-desktop{display:none !important}
           .topbar-mobile{display:flex !important}
           .main-pad{padding:12px 12px !important}
-          table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch}
           button{min-height:44px}
           input,select,textarea{font-size:16px !important}
           .hide-mobile{display:none !important}
+          .hide-xs{display:none !important}
           .page-header-wrap{flex-direction:column;align-items:flex-start !important}
           .card-grid{grid-template-columns:1fr !important}
+          /* Card-style table transformation */
+          .app-table-card thead{display:none}
+          .app-table-card,
+          .app-table-card tbody{display:block;width:100%}
+          .app-table-card tbody tr{
+            display:block;
+            border:1px solid #dde7e9;
+            border-radius:8px;
+            margin-bottom:8px;
+            background:#fff !important;
+            padding:2px 0;
+          }
+          .app-table-card tbody td{
+            display:flex !important;
+            justify-content:space-between;
+            align-items:center;
+            padding:7px 14px !important;
+            border-bottom:1px solid #f0f5f6 !important;
+            font-size:13px;
+            white-space:normal !important;
+            max-width:none !important;
+            overflow:visible !important;
+          }
+          .app-table-card tbody td:last-child{border-bottom:none !important}
+          .app-table-card tbody td[data-label]::before{
+            content:attr(data-label);
+            font-size:10px;
+            font-weight:700;
+            color:#6b8f95;
+            text-transform:uppercase;
+            letter-spacing:0.06em;
+            flex-shrink:0;
+            margin-right:12px;
+            min-width:80px;
+          }
         }
         @media(max-width:480px){
           .main-pad{padding:10px !important}

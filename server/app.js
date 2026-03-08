@@ -8,7 +8,7 @@ import cors from 'cors'
 import bodyParser from 'body-parser'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
-import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync, chmodSync } from 'fs'
+import { readFileSync, writeFileSync, existsSync, mkdirSync, chmodSync, accessSync, constants } from 'fs'
 import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
 
@@ -72,23 +72,22 @@ let _memLog          = []
 let _memDistributors = null
 let _memLocations    = null
 
-const isWritable = (dir) => {
-  try {
-    mkdirSync(dir, { recursive: true })
-    // Actually test write access — mkdirSync on an existing dir never throws
-    const probe = join(dir, '.write-probe')
-    writeFileSync(probe, '')
-    unlinkSync(probe)
-    return true
-  } catch { return false }
-}
+// Cached data directory — resolved once on startup, never re-evaluated
+// This avoids race conditions where concurrent requests get different dirs
+let _dataDir = null
 
 const getDataDir = () => {
-  if (isWritable(LOCAL_DATA_DIR)) return LOCAL_DATA_DIR
-  // Fallback serverless: /tmp
-  const tmp = '/tmp/stockin-data'
-  mkdirSync(tmp, { recursive: true })
-  return tmp
+  if (_dataDir) return _dataDir
+  try {
+    mkdirSync(LOCAL_DATA_DIR, { recursive: true })
+    accessSync(LOCAL_DATA_DIR, constants.W_OK)
+    _dataDir = LOCAL_DATA_DIR
+  } catch {
+    const tmp = '/tmp/stockin-data'
+    mkdirSync(tmp, { recursive: true })
+    _dataDir = tmp
+  }
+  return _dataDir
 }
 
 const readJSON = (file) => {
