@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Building2, MapPin, Users, BarChart2, Settings, Plus, Pencil, Trash2, X, Search, LogOut, Eye, EyeOff, Check, AlertTriangle, ArrowLeft, Mail, RefreshCw, ChevronRight, Wifi, WifiOff, Loader2, Upload } from 'lucide-react'
+import { Building2, MapPin, Users, BarChart2, Settings, Plus, Pencil, Trash2, X, Search, LogOut, Eye, EyeOff, Check, AlertTriangle, ArrowLeft, Mail, RefreshCw, ChevronRight, ChevronLeft, Menu, Wifi, WifiOff, Loader2, Upload } from 'lucide-react'
 import { saAPI } from '../auth.js'
 
 // ── Theme ─────────────────────────────────────────────────────────────────────
@@ -1411,105 +1411,100 @@ const NAV = [
 export default function SuperadminPanel({ user, onLogout }) {
   const [view,  setView]  = useState('distribuidores')
   const [notif, setNotif] = useState(null)
+  const [sideOpen, setSideOpen] = useState(false)
+  const [sideCollapsed, setSideCollapsed] = useState(() => {
+    const saved = localStorage.getItem('stockin_sidebar_collapsed')
+    if (saved !== null) return saved === 'true'
+    return typeof window !== 'undefined' && window.innerWidth <= 1024
+  })
+  const toggleSidebar = () => setSideCollapsed(c => { const n = !c; localStorage.setItem('stockin_sidebar_collapsed', String(n)); return n })
+  const SW = sideCollapsed ? 64 : 220
 
   const toast = (msg, type = 'ok') => { setNotif({ msg, type }); setTimeout(() => setNotif(null), 5000) }
 
-  return (
-    <div style={{ fontFamily: "'IBM Plex Sans',sans-serif", background: T.bg, minHeight: '100vh', color: T.text, display: 'flex', flexDirection: 'column' }}>
+  const navigate = (id) => { setView(id); setSideOpen(false) }
 
-      {/* ── Mobile top header (hidden on desktop via CSS) ── */}
-      <header className="sa-mob-header" style={{ display: 'none', position: 'sticky', top: 0, zIndex: 250, background: T.brand, flexShrink: 0, padding: '0 16px', height: 52, alignItems: 'center', justifyContent: 'space-between', boxShadow: '0 2px 8px rgba(3,70,80,0.25)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div style={{ width: 28, height: 28, borderRadius: 7, background: T.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            <Ic n="settings" s={14} />
-          </div>
-          <span style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>
-            <span style={{ color: '#5dd8e8' }}>rekor</span><span style={{ color: 'rgba(255,255,255,0.4)' }}>.es</span>
-            <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', marginLeft: 8, fontWeight: 500 }}>SuperAdmin</span>
-          </span>
+  return (
+    <div style={{ fontFamily: "'IBM Plex Sans',sans-serif", background: T.bg, minHeight: '100vh', color: T.text }}>
+
+      {/* ── Fixed Header ── */}
+      <header style={{ position: 'fixed', top: 0, left: 0, right: 0, height: 56, background: T.brand, display: 'flex', alignItems: 'center', gap: 10, padding: '0 16px', zIndex: 200, boxShadow: '0 2px 8px rgba(3,70,80,0.18)' }}>
+        <button className="sa-hamburger" onClick={() => setSideOpen(s => !s)} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 8, color: '#fff', cursor: 'pointer', padding: '7px', display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+          <Menu size={18} />
+        </button>
+        <div style={{ width: 32, height: 32, borderRadius: 8, background: T.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <Ic n="settings" s={16} />
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.7)' }}>{NAV.find(n => n.id === view)?.label}</span>
-          <button onClick={onLogout} title="Cerrar sesión" style={{ background: 'rgba(255,255,255,0.12)', border: 'none', borderRadius: 7, padding: '6px 8px', cursor: 'pointer', color: 'rgba(255,255,255,0.85)', display: 'flex', alignItems: 'center' }}>
+        <span style={{ fontSize: 14, fontWeight: 800, color: '#fff', whiteSpace: 'nowrap' }}>
+          <span style={{ color: '#5dd8e8' }}>rekor</span><span style={{ color: 'rgba(255,255,255,0.45)' }}>.es</span> StockIn
+        </span>
+        <div className="sa-header-location" style={{ flex: 1, textAlign: 'center', fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.7)' }}>SuperAdmin</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          <div style={{ width: 32, height: 32, borderRadius: 8, background: T.purple, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: '#fff', flexShrink: 0 }}>
+            {user?.fullName?.[0]?.toUpperCase() || 'S'}
+          </div>
+          <span className="sa-header-uname" style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.85)' }}>{user?.fullName || 'Superadmin'}</span>
+          <button onClick={onLogout} title="Cerrar sesión" style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 6, color: 'rgba(255,255,255,0.65)', cursor: 'pointer', padding: '6px', display: 'flex' }}>
             <Ic n="logout" s={14} />
           </button>
         </div>
       </header>
 
-      {/* ── Desktop layout: sidebar + main ── */}
-      <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
+      {/* ── Fixed Sidebar ── */}
+      <aside className="sa-sidebar" style={{ position: 'fixed', top: 56, left: 0, bottom: 0, width: SW, background: '#fff', borderRight: '1px solid #dde7e9', display: 'flex', flexDirection: 'column', zIndex: 150, transition: 'width 0.2s ease', overflow: 'hidden' }}>
+        <nav style={{ flex: 1, padding: '10px 8px', overflowY: 'auto' }}>
+          {NAV.map(item => (
+            <button
+              key={item.id}
+              onClick={() => navigate(item.id)}
+              className="sa-nav-btn"
+              data-active={view === item.id ? 'true' : 'false'}
+              title={sideCollapsed ? item.label : ''}
+              style={{ width: '100%', display: 'flex', alignItems: 'center', gap: sideCollapsed ? 0 : 9, padding: sideCollapsed ? '9px 0' : '9px 12px', justifyContent: sideCollapsed ? 'center' : 'flex-start', borderRadius: 9, border: 'none', cursor: 'pointer', marginBottom: 2, fontFamily: 'inherit', background: view === item.id ? '#0592A7' : 'transparent', color: view === item.id ? '#fff' : '#034650', fontSize: 13, fontWeight: view === item.id ? 600 : 400, textAlign: 'left', transition: 'background 0.12s, color 0.12s' }}
+            >
+              <Ic n={item.icon} s={sideCollapsed ? 18 : 15} />
+              {!sideCollapsed && <span style={{ flex: 1 }}>{item.label}</span>}
+            </button>
+          ))}
+        </nav>
+        <button onClick={toggleSidebar} style={{ width: '100%', padding: '10px', borderTop: '1px solid #dde7e9', background: 'none', borderLeft: 'none', borderRight: 'none', borderBottom: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: sideCollapsed ? 'center' : 'flex-start', gap: 6, fontSize: 12, fontWeight: 600, color: '#6b8f95', fontFamily: 'inherit' }}>
+          {sideCollapsed ? <ChevronRight size={16} /> : <><ChevronLeft size={16} /><span>Contraer</span></>}
+        </button>
+      </aside>
 
-        {/* Sidebar */}
-        <aside className="sa-sidebar" style={{ width: 234, background: T.brand, display: 'flex', flexDirection: 'column', position: 'sticky', top: 0, height: '100vh', flexShrink: 0 }}>
-          {/* Logo */}
-          <div style={{ padding: '18px 16px 14px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div style={{ width: 36, height: 36, borderRadius: 10, background: T.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 2px 8px rgba(5,146,167,0.4)' }}>
-                <Ic n="settings" s={17} />
-              </div>
-              <div>
-                <div style={{ fontSize: 15, fontWeight: 800, color: '#fff', letterSpacing: '-0.3px' }}><span style={{ color: '#5dd8e8' }}>rekor</span><span style={{ color: 'rgba(255,255,255,0.35)' }}>.es</span></div>
-                <div style={{ fontSize: 9.5, color: 'rgba(255,255,255,0.38)', letterSpacing: '0.12em', textTransform: 'uppercase', marginTop: 1 }}>Panel SuperAdmin</div>
-              </div>
-            </div>
+      {/* ── Mobile drawer overlay ── */}
+      {sideOpen && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 300, display: 'flex' }} onClick={() => setSideOpen(false)}>
+          <div style={{ width: 260, background: '#fff', display: 'flex', flexDirection: 'column', height: '100%', borderRight: '1px solid #dde7e9', animation: 'slideRight 0.22s ease' }} onClick={e => e.stopPropagation()}>
+            <nav style={{ flex: 1, padding: '10px 8px', overflowY: 'auto', marginTop: 8 }}>
+              {NAV.map(item => (
+                <button
+                  key={item.id}
+                  data-active={view === item.id ? 'true' : 'false'}
+                  onClick={() => navigate(item.id)}
+                  className="sa-nav-btn"
+                  style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 9, padding: '9px 12px', borderRadius: 9, border: 'none', cursor: 'pointer', marginBottom: 2, fontFamily: 'inherit', background: view === item.id ? '#0592A7' : 'transparent', color: view === item.id ? '#fff' : '#034650', fontSize: 13, fontWeight: 600, textAlign: 'left' }}
+                >
+                  <Ic n={item.icon} s={15} /><span style={{ flex: 1 }}>{item.label}</span>
+                </button>
+              ))}
+            </nav>
           </div>
+          <div style={{ flex: 1, background: 'rgba(3,70,80,0.5)' }} />
+        </div>
+      )}
 
-          {/* Nav */}
-          <nav style={{ flex: 1, padding: '10px 8px', overflowY: 'auto' }}>
-            {NAV.map(item => (
-              <button
-                key={item.id}
-                onClick={() => setView(item.id)}
-                className="sa-nav-btn"
-                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 9, padding: '9px 12px', borderRadius: 9, border: 'none', cursor: 'pointer', marginBottom: 2, fontFamily: 'inherit', background: view === item.id ? 'rgba(255,255,255,0.13)' : 'transparent', color: view === item.id ? '#fff' : 'rgba(255,255,255,0.52)', fontSize: 13, fontWeight: view === item.id ? 600 : 400, textAlign: 'left', transition: 'background 0.12s, color 0.12s', boxShadow: view === item.id ? 'inset 2px 0 0 #5dd8e8' : 'none' }}
-              >
-                <Ic n={item.icon} s={15} />
-                <span style={{ flex: 1 }}>{item.label}</span>
-                {view === item.id && <div style={{ width: 5, height: 5, borderRadius: '50%', background: T.accent, flexShrink: 0 }} />}
-              </button>
-            ))}
-          </nav>
-
-          {/* User + logout */}
-          <div style={{ padding: '10px 10px 16px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 8px', borderRadius: 10, background: 'rgba(255,255,255,0.07)' }}>
-              <div style={{ width: 32, height: 32, borderRadius: 8, background: T.purple, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 13, fontWeight: 700, color: '#fff', boxShadow: '0 2px 6px rgba(124,58,237,0.35)' }}>
-                {user?.fullName?.[0]?.toUpperCase() || 'S'}
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.fullName || 'Superadmin'}</div>
-                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)' }}>Super Admin</div>
-              </div>
-              <button onClick={onLogout} title="Cerrar sesión" style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 7, color: 'rgba(255,255,255,0.65)', cursor: 'pointer', padding: '6px 7px', display: 'flex', transition: 'background 0.12s' }}>
-                <Ic n="logout" s={14} />
-              </button>
-            </div>
-          </div>
-        </aside>
-
-        {/* Main content */}
-        <main className="sa-main" style={{ flex: 1, overflow: 'auto', minWidth: 0 }}>
-          <div className="sa-content" style={{ padding: '28px 32px', maxWidth: 1100, margin: '0 auto' }}>
-            {view === 'distribuidores' && <DistribuidoresModule toast={toast} />}
-            {view === 'locales'        && <LocalesModule        toast={toast} />}
-            {view === 'usuarios'       && <UsuariosModule       toast={toast} />}
-            {view === 'informes'       && <InformesModule       toast={toast} />}
-            {view === 'changelog'      && <ChangelogModule      toast={toast} />}
-            {view === 'config'         && <ConfiguracionModule  toast={toast} />}
-          </div>
-        </main>
-
-      </div>{/* end desktop layout */}
-
-      {/* ── Mobile bottom nav (hidden on desktop via CSS) ── */}
-      <nav className="sa-mob-nav" style={{ display: 'none', position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 250, background: T.brand, borderTop: '1px solid rgba(255,255,255,0.12)', padding: '6px 0', justifyContent: 'space-around', alignItems: 'center', boxShadow: '0 -2px 16px rgba(3,70,80,0.2)' }}>
-        {NAV.map(item => (
-          <button key={item.id} onClick={() => setView(item.id)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, background: view === item.id ? 'rgba(255,255,255,0.14)' : 'none', border: 'none', cursor: 'pointer', borderRadius: 10, color: view === item.id ? '#fff' : 'rgba(255,255,255,0.42)', padding: '5px 6px', flex: 1, minWidth: 0, fontFamily: 'inherit', transition: 'all 0.14s' }}>
-            <Ic n={item.icon} s={view === item.id ? 21 : 19} />
-            <span style={{ fontSize: 9, fontWeight: view === item.id ? 700 : 400, letterSpacing: '0.02em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>{item.label}</span>
-          </button>
-        ))}
-      </nav>
+      {/* ── Main content area ── */}
+      <div className="sa-main" style={{ paddingTop: 56, marginLeft: SW, transition: 'margin-left 0.2s ease', minHeight: '100vh' }}>
+        <div className="sa-content" style={{ padding: '28px 32px', maxWidth: 1100, margin: '0 auto' }}>
+          {view === 'distribuidores' && <DistribuidoresModule toast={toast} />}
+          {view === 'locales'        && <LocalesModule        toast={toast} />}
+          {view === 'usuarios'       && <UsuariosModule       toast={toast} />}
+          {view === 'informes'       && <InformesModule       toast={toast} />}
+          {view === 'changelog'      && <ChangelogModule      toast={toast} />}
+          {view === 'config'         && <ConfiguracionModule  toast={toast} />}
+        </div>
+      </div>
 
       {/* Toast notification */}
       {notif && (
@@ -1526,6 +1521,7 @@ export default function SuperadminPanel({ user, onLogout }) {
         input:focus,select:focus,textarea:focus{border-color:${T.accent} !important;box-shadow:0 0 0 3px rgba(5,146,167,0.13) !important;outline:none}
         @keyframes spin{to{transform:rotate(360deg)}}
         @keyframes slideIn{from{opacity:0;transform:translateX(14px)}to{opacity:1;transform:none}}
+        @keyframes slideRight{from{transform:translateX(-100%)}to{transform:none}}
         @keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
         /* Buttons */
         .sa-btn{transition:filter 0.12s,box-shadow 0.12s,transform 0.1s !important}
@@ -1541,47 +1537,42 @@ export default function SuperadminPanel({ user, onLogout }) {
         /* Table hover */
         .sa-table tbody tr{transition:background 0.07s}
         .sa-table tbody tr:hover>td{background:#f4f9fa !important}
-        /* Sidebar nav hover */
+        /* Sidebar nav */
+        .sa-hamburger{display:none}
         .sa-nav-btn{transition:background 0.12s,color 0.12s !important}
-        .sa-nav-btn:hover{background:rgba(255,255,255,0.09) !important;color:rgba(255,255,255,0.85) !important}
+        .sa-nav-btn:hover:not(:disabled){background:rgba(5,146,167,0.08) !important;color:#034650 !important}
+        .sa-nav-btn[data-active="true"]:hover{background:#046f80 !important;color:#fff !important}
         /* Modal */
         .sa-modal-inner{animation:fadeUp 0.18s ease}
-        /* Mobile layout — hidden by default */
-        .sa-mob-header{display:none !important}
-        .sa-mob-nav{display:none !important}
         /* Responsive breakpoints */
         @media(max-width:767px){
+          .sa-hamburger{display:flex !important}
           .sa-sidebar{display:none !important}
-          .sa-mob-header{display:flex !important}
-          .sa-mob-nav{display:flex !important}
-          .sa-content{padding:14px 14px 80px !important}
+          .sa-main{margin-left:0 !important;transition:none !important}
+          .sa-header-uname{display:none !important}
+          .sa-header-location{display:none !important}
+          .sa-content{padding:14px 14px 24px !important}
           .sa-g2{grid-template-columns:1fr !important}
           .sa-dist-grid{grid-template-columns:1fr !important}
           .sa-token-row{flex-direction:column !important;align-items:stretch !important}
           .sa-token-row>*{width:100% !important}
-          .sa-toast{top:auto !important;bottom:74px !important;right:12px !important;left:12px !important;max-width:none !important;border-radius:12px !important}
+          .sa-toast{top:auto !important;bottom:16px !important;right:12px !important;left:12px !important;max-width:none !important;border-radius:12px !important}
           .sa-modal-inner{padding:18px !important;max-height:95vh !important}
           .sa-card:hover{transform:none !important;box-shadow:none !important}
-          /* iOS — prevent input zoom */
           input,select,textarea{font-size:16px !important}
-          /* Tap target size */
           .sa-btn{min-height:40px !important}
-          /* Hide secondary columns on mobile */
           .sa-hide-xs{display:none !important}
+          button{min-height:44px}
         }
         @media(max-width:479px){
-          .sa-content{padding:12px 12px 80px !important}
+          .sa-content{padding:12px !important}
           .sa-sync-grid{grid-template-columns:1fr 1fr !important}
           .sa-table-wrap{border-radius:10px !important}
         }
         @media(max-width:359px){
           .sa-sync-grid{grid-template-columns:1fr !important}
         }
-        /* iOS safe area for bottom nav */
-        @supports(padding-bottom:env(safe-area-inset-bottom)){
-          .sa-mob-nav{padding-bottom:calc(6px + env(safe-area-inset-bottom)) !important}
-          .sa-content{padding-bottom:calc(80px + env(safe-area-inset-bottom)) !important}
-        }
+        @media(min-width:768px){.sa-hamburger{display:none !important}}
       `}</style>
     </div>
   )

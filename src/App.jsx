@@ -1988,7 +1988,7 @@ function ProveedoresView({suppliers,albaranes}) {
 // ═══════════════════════════════════════════════════════════════════════════════
 //  CAMARERO PAGE — minimal layout, only albaranes
 // ═══════════════════════════════════════════════════════════════════════════════
-function CamareroPage({user,agoraState,failingSince,onLogout,onRetrySync,syncing,products,suppliers,warehouses,albaranes,onImportarAlbaran,toast,supplierRefs,online,queueCount}) {
+function CamareroPage({user,agoraState,failingSince,onLogout,onRetrySync,syncing,products,suppliers,warehouses,albaranes,onImportarAlbaran,toast,supplierRefs,online,queueCount,sideCollapsed,toggleSidebar,SW,sideOpen,setSideOpen}) {
   const MY_ALBS_KEY=`stockin_camarero_albs_${user?.id||user?.username||"u"}`
   const loadMyAlbs=()=>{try{return JSON.parse(localStorage.getItem(MY_ALBS_KEY)||"[]")}catch{return[]}}
   const [view,setView]=useState("list")
@@ -2004,61 +2004,87 @@ function CamareroPage({user,agoraState,failingSince,onLogout,onRetrySync,syncing
   const ROLE_BADGE_COLOR={superadmin:"#7c3aed",admin:T.accent,encargado:T.brand,camarero:T.green,manager:T.brand,employee:T.green,readonly:T.muted}
   const ROLE_BADGE_LABEL={superadmin:"Super Admin",admin:"Admin",encargado:"Encargado",camarero:"Camarero",manager:"Encargado",employee:"Camarero",readonly:"Lectura"}
   const role=user?.role||"camarero"
+  const CAM_NAV=[{id:"albaranes",label:"Albaranes",icon:"albaran"}]
 
   return (
     <div style={{fontFamily:"'IBM Plex Sans',sans-serif",background:T.bg,minHeight:"100vh",color:T.text}}>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700;800&display=swap');*{box-sizing:border-box;margin:0;padding:0}@keyframes spin{to{transform:rotate(360deg)}}@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}`}</style>
-      {/* Header */}
-      <div style={{background:T.brand,padding:"12px 20px",display:"flex",alignItems:"center",gap:12,position:"sticky",top:0,zIndex:100}}>
+      {/* ── Fixed Header ── */}
+      <header style={{position:"fixed",top:0,left:0,right:0,height:56,background:T.brand,display:"flex",alignItems:"center",gap:10,padding:"0 16px",zIndex:200,boxShadow:"0 2px 8px rgba(3,70,80,0.18)"}}>
+        <button className="app-hamburger" onClick={()=>setSideOpen(s=>!s)} style={{background:"rgba(255,255,255,0.1)",border:"none",borderRadius:8,color:"#fff",cursor:"pointer",padding:"7px",display:"flex",alignItems:"center",flexShrink:0}}><Ic n="menu" s={18}/></button>
         <div style={{width:32,height:32,borderRadius:8,background:T.accent,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Ic n="warehouse" s={16}/></div>
-        <div style={{flex:1}}>
-          <div style={{fontSize:14,fontWeight:700,color:"#fff"}}><span style={{color:T.accent}}>rekor</span>.es StockIn</div>
-          <div style={{fontSize:10,color:"rgba(255,255,255,0.45)",letterSpacing:"0.05em"}}>Albaranes</div>
-        </div>
-        <div style={{display:"flex",alignItems:"center",gap:8}}>
-          <div style={{textAlign:"right"}}>
-            <div style={{fontSize:12,fontWeight:600,color:"#fff"}}>{user?.fullName||user?.username}</div>
-            <div style={{fontSize:10,color:"rgba(255,255,255,0.5)"}}>{ROLE_BADGE_LABEL[role]||role}</div>
-          </div>
+        <span style={{fontSize:14,fontWeight:800,color:"#fff",whiteSpace:"nowrap"}}><span style={{color:"#5dd8e8"}}>rekor</span><span style={{color:"rgba(255,255,255,0.45)"}}>.es</span> StockIn</span>
+        <div className="header-location" style={{flex:1,textAlign:"center",fontSize:13,fontWeight:600,color:"rgba(255,255,255,0.7)"}}>Albaranes</div>
+        <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
           {!online&&<div style={{width:7,height:7,borderRadius:"50%",background:T.orange,flexShrink:0}}/>}
+          <div style={{width:32,height:32,borderRadius:8,background:ROLE_BADGE_COLOR[role]||T.muted,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:700,color:"#fff",flexShrink:0}}>{user?.fullName?.[0]?.toUpperCase()||"?"}</div>
+          <span className="header-uname" style={{fontSize:12,fontWeight:600,color:"rgba(255,255,255,0.85)"}}>{user?.fullName||user?.username}</span>
           <button onClick={onLogout} title="Cerrar sesión" style={{background:"rgba(255,255,255,0.1)",border:"none",borderRadius:6,color:"rgba(255,255,255,0.65)",cursor:"pointer",padding:"6px",display:"flex"}}><Ic n="logout" s={14}/></button>
         </div>
-      </div>
-      {/* Offline banner */}
-      {!online&&<div style={{background:"rgba(234,108,0,0.1)",borderBottom:`2px solid ${T.orange}`,padding:"7px 20px",display:"flex",alignItems:"center",justifyContent:"center",gap:10,fontSize:12,fontWeight:600,color:T.orange}}>
-        ⚠ Sin conexión — las acciones se sincronizarán al reconectar.{queueCount>0&&<span style={{background:T.orange,color:"#fff",borderRadius:12,padding:"2px 8px",fontSize:11}}>{queueCount} pendiente{queueCount>1?"s":""}</span>}
-      </div>}
-      {/* Ágora failing banner */}
-      {agoraState==="failing"&&online&&<AgoraBanner failingSince={failingSince} onRetry={onRetrySync} syncing={syncing}/>}
-      {/* Main content */}
-      <div style={{maxWidth:800,margin:"0 auto",padding:"24px 20px"}}>
-        {agoraState==="unconfigured"
-          ? <WaitingScreen/>
-          : view==="list"
-            ? <>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
-                  <h1 style={{fontSize:20,fontWeight:800,color:T.brand,margin:0}}>Mis albaranes</h1>
-                  <Btn onClick={()=>setView("new")} variant="primary"><Ic n="plus" s={13}/>Nuevo albarán</Btn>
-                </div>
-                {myAlbs.length===0
-                  ? <div style={{...S.card,padding:40,textAlign:"center",color:T.muted,display:"flex",flexDirection:"column",alignItems:"center",gap:10}}><Ic n="albaran" s={28}/>No has creado ningún albarán todavía.<div style={{fontSize:12}}>Pulsa "Nuevo albarán" para empezar.</div></div>
-                  : myAlbs.map((alb,i)=>(
-                    <div key={i} style={{...S.card,marginBottom:10,display:"flex",alignItems:"center",gap:14,padding:"14px 16px"}}>
-                      <div style={{width:38,height:38,borderRadius:9,background:T.bg,display:"flex",alignItems:"center",justifyContent:"center",border:`1px solid ${T.border}`,flexShrink:0}}><Ic n="albaran" s={18}/></div>
-                      <div style={{flex:1,minWidth:0}}>
-                        <div style={{fontWeight:600,color:T.text}}>{alb.Serie}-{alb.Number}</div>
-                        <div style={{fontSize:12,color:T.muted,marginTop:2}}>{alb.Date}  ·  {alb.Lines?.length||0} línea{alb.Lines?.length!==1?"s":""}{alb.Supplier?.Name?` · ${alb.Supplier.Name}`:""}</div>
+      </header>
+      {/* ── Fixed Sidebar ── */}
+      <aside className="app-sidebar" style={{position:"fixed",top:56,left:0,bottom:0,width:SW,background:"#fff",borderRight:"1px solid #dde7e9",display:"flex",flexDirection:"column",zIndex:150,transition:"width 0.2s ease",overflow:"hidden"}}>
+        <nav style={{flex:1,padding:"10px 8px",overflowY:"auto"}}>
+          {CAM_NAV.map(item=>(
+            <button key={item.id} data-active={view==="list"?"true":"false"} onClick={()=>{setView("list");setSideOpen(false)}} className="app-nav-btn" title={sideCollapsed?item.label:""} style={{width:"100%",display:"flex",alignItems:"center",gap:sideCollapsed?0:9,padding:sideCollapsed?"9px 0":"9px 12px",justifyContent:sideCollapsed?"center":"flex-start",borderRadius:9,border:"none",cursor:"pointer",marginBottom:2,fontFamily:"inherit",background:view==="list"?"#0592A7":"transparent",color:view==="list"?"#fff":"#034650",fontSize:13,fontWeight:view==="list"?600:400,textAlign:"left",transition:"background 0.12s,color 0.12s"}}>
+              <Ic n={item.icon} s={sideCollapsed?18:15}/>
+              {!sideCollapsed&&<span style={{flex:1}}>{item.label}</span>}
+            </button>
+          ))}
+        </nav>
+        <button onClick={toggleSidebar} style={{width:"100%",padding:"10px",borderTop:"1px solid #dde7e9",background:"none",borderLeft:"none",borderRight:"none",borderBottom:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:sideCollapsed?"center":"flex-start",gap:6,fontSize:12,fontWeight:600,color:"#6b8f95",fontFamily:"inherit"}}>
+          {sideCollapsed?<ChevronRight size={16}/>:<><ChevronLeft size={16}/><span>Contraer</span></>}
+        </button>
+      </aside>
+      {/* ── Mobile drawer overlay ── */}
+      {sideOpen&&(
+        <div style={{position:"fixed",inset:0,zIndex:300,display:"flex"}} onClick={()=>setSideOpen(false)}>
+          <div style={{width:260,background:"#fff",display:"flex",flexDirection:"column",height:"100%",borderRight:"1px solid #dde7e9",animation:"slideRight 0.22s ease"}} onClick={e=>e.stopPropagation()}>
+            <nav style={{flex:1,padding:"10px 8px",overflowY:"auto",marginTop:8}}>
+              {CAM_NAV.map(item=>(
+                <button key={item.id} data-active={view==="list"?"true":"false"} onClick={()=>{setView("list");setSideOpen(false)}} className="app-nav-btn" style={{width:"100%",display:"flex",alignItems:"center",gap:9,padding:"9px 12px",borderRadius:9,border:"none",cursor:"pointer",marginBottom:2,fontFamily:"inherit",background:view==="list"?"#0592A7":"transparent",color:view==="list"?"#fff":"#034650",fontSize:13,fontWeight:600,textAlign:"left"}}>
+                  <Ic n={item.icon} s={15}/><span style={{flex:1}}>{item.label}</span>
+                </button>
+              ))}
+            </nav>
+          </div>
+          <div style={{flex:1,background:"rgba(3,70,80,0.5)"}}/>
+        </div>
+      )}
+      {/* ── Main content area ── */}
+      <div className="app-main" style={{paddingTop:56,marginLeft:SW,transition:"margin-left 0.2s ease",minHeight:"100vh"}}>
+        {!online&&<div style={{background:"rgba(234,108,0,0.1)",borderBottom:`2px solid ${T.orange}`,padding:"7px 20px",display:"flex",alignItems:"center",justifyContent:"center",gap:10,fontSize:12,fontWeight:600,color:T.orange}}>
+          ⚠ Sin conexión — las acciones se sincronizarán al reconectar.{queueCount>0&&<span style={{background:T.orange,color:"#fff",borderRadius:12,padding:"2px 8px",fontSize:11}}>{queueCount} pendiente{queueCount>1?"s":""}</span>}
+        </div>}
+        {agoraState==="failing"&&online&&<AgoraBanner failingSince={failingSince} onRetry={onRetrySync} syncing={syncing}/>}
+        <div style={{maxWidth:800,margin:"0 auto",padding:"24px 20px"}} className="main-pad">
+          {agoraState==="unconfigured"
+            ? <WaitingScreen/>
+            : view==="list"
+              ? <>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+                    <h1 style={{fontSize:20,fontWeight:800,color:T.brand,margin:0}}>Mis albaranes</h1>
+                    <Btn onClick={()=>setView("new")} variant="primary"><Ic n="plus" s={13}/>Nuevo albarán</Btn>
+                  </div>
+                  {myAlbs.length===0
+                    ? <div style={{...S.card,padding:40,textAlign:"center",color:T.muted,display:"flex",flexDirection:"column",alignItems:"center",gap:10}}><Ic n="albaran" s={28}/>No has creado ningún albarán todavía.<div style={{fontSize:12}}>Pulsa "Nuevo albarán" para empezar.</div></div>
+                    : myAlbs.map((alb,i)=>(
+                      <div key={i} style={{...S.card,marginBottom:10,display:"flex",alignItems:"center",gap:14,padding:"14px 16px"}}>
+                        <div style={{width:38,height:38,borderRadius:9,background:T.bg,display:"flex",alignItems:"center",justifyContent:"center",border:`1px solid ${T.border}`,flexShrink:0}}><Ic n="albaran" s={18}/></div>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{fontWeight:600,color:T.text}}>{alb.Serie}-{alb.Number}</div>
+                          <div style={{fontSize:12,color:T.muted,marginTop:2}}>{alb.Date}  ·  {alb.Lines?.length||0} línea{alb.Lines?.length!==1?"s":""}{alb.Supplier?.Name?` · ${alb.Supplier.Name}`:""}</div>
+                        </div>
+                        <div style={{fontSize:11,color:T.muted,textAlign:"right",flexShrink:0}}>
+                          {new Date(alb._createdAt).toLocaleString("es-ES",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})}
+                        </div>
                       </div>
-                      <div style={{fontSize:11,color:T.muted,textAlign:"right",flexShrink:0}}>
-                        {new Date(alb._createdAt).toLocaleString("es-ES",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})}
-                      </div>
-                    </div>
-                  ))
-                }
-              </>
-            : <AlbaranForm products={products} suppliers={suppliers} warehouses={warehouses}
-                onSave={handleSave} onCancel={()=>setView("list")} toast={toast} supplierRefs={supplierRefs}/>
-        }
+                    ))
+                  }
+                </>
+              : <AlbaranForm products={products} suppliers={suppliers} warehouses={warehouses}
+                  onSave={handleSave} onCancel={()=>setView("list")} toast={toast} supplierRefs={supplierRefs}/>
+          }
+        </div>
       </div>
     </div>
   )
@@ -2075,6 +2101,13 @@ export default function App() {
   const [activeId,   setActiveId]   =useState(loadActiveId)
   const [view,       setView]       =useState("dashboard")
   const [sideOpen,   setSideOpen]   =useState(false)
+  const [sideCollapsed, setSideCollapsed] = useState(() => {
+    const saved = localStorage.getItem('stockin_sidebar_collapsed')
+    if (saved !== null) return saved === 'true'
+    return typeof window !== 'undefined' && window.innerWidth <= 1024
+  })
+  const toggleSidebar = () => setSideCollapsed(c => { const n = !c; localStorage.setItem('stockin_sidebar_collapsed', String(n)); return n })
+  const SW = sideCollapsed ? 64 : 220
   const [modal,      setModal]      =useState(null)
   const [editConn,   setEditConn]   =useState(null)
 
@@ -2439,89 +2472,109 @@ export default function App() {
   // Superadmin → completely separate panel, never sees stock
   if(role==="superadmin") return <SuperadminPanel user={user} onLogout={handleLogout}/>
 
-  // Camarero full-page layout (no sidebar)
+  // Camarero full-page layout (unified sidebar)
   if(isCamarero) return <CamareroPage
     user={user} agoraState={agoraState} failingSince={failingSince}
     onLogout={handleLogout} onRetrySync={()=>doSync()} syncing={syncing}
     products={products} suppliers={suppliers} warehouses={warehouses}
     albaranes={albaranes} onImportarAlbaran={importarAlbaran}
     toast={toast} supplierRefs={supplierRefs} online={online} queueCount={queueCount}
+    sideCollapsed={sideCollapsed} toggleSidebar={toggleSidebar} SW={SW}
+    sideOpen={sideOpen} setSideOpen={setSideOpen}
   />
 
   const ROLE_BADGE_COLOR={superadmin:"#7c3aed",admin:T.accent,encargado:T.brand,camarero:T.green,manager:T.brand,employee:T.green,readonly:T.muted}
   const ROLE_BADGE_LABEL={superadmin:"Super Admin",admin:"Admin",encargado:"Encargado",camarero:"Camarero",manager:"Encargado",employee:"Camarero",readonly:"Lectura"}
 
-  const SidebarContent=()=>(
-    <>
-      <div style={{padding:"18px 16px 14px",borderBottom:"1px solid rgba(255,255,255,0.1)"}}>
-        <div style={{display:"flex",alignItems:"center",gap:10}}>
-          <div style={{width:36,height:36,borderRadius:10,background:T.accent,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,boxShadow:"0 2px 8px rgba(5,146,167,0.4)"}}>
-            <Ic n="warehouse" s={17}/>
-          </div>
-          <div className="sidebar-logo-text">
-            <div style={{fontSize:15,fontWeight:800,color:"#fff",letterSpacing:"-0.3px"}}><span style={{color:"#5dd8e8"}}>rekor</span><span style={{color:"rgba(255,255,255,0.35)"}}>.es</span></div>
-            <div style={{fontSize:9.5,color:"rgba(255,255,255,0.38)",letterSpacing:"0.12em",textTransform:"uppercase",marginTop:1}}>StockIn</div>
-          </div>
-        </div>
-        {PERMS.canManageConns(role)&&<div style={{marginTop:10}}>
-          <ConnectionSelector connections={connections} activeId={activeId} onSwitch={switchConn} onCreate={()=>setModal("new-conn")} onManage={()=>setModal("manage-conn")}/>
-        </div>}
-      </div>
-      {activeConn?.mode==="acms"&&activeConn.workplaces?.length>0&&<WorkplaceSelector workplaces={activeConn.workplaces} activeId={activeConn.activeWorkplace} onChange={switchWorkplace}/>}
-      <nav style={{flex:1,padding:"10px 8px",overflowY:"auto"}}>
-        {NAV_ITEMS.map(item=>(
-          <button key={item.id} onClick={()=>navigate(item.id)} className="app-nav-btn" style={{width:"100%",display:"flex",alignItems:"center",gap:9,padding:"9px 12px",borderRadius:9,border:"none",cursor:"pointer",marginBottom:2,fontFamily:"inherit",background:view===item.id?"rgba(255,255,255,0.13)":"transparent",color:view===item.id?"#fff":"rgba(255,255,255,0.52)",fontSize:13,fontWeight:view===item.id?600:400,textAlign:"left",transition:"background 0.12s,color 0.12s",boxShadow:view===item.id?"inset 2px 0 0 #5dd8e8":"none"}}>
-            <Ic n={item.icon} s={15}/>
-            <span className="sidebar-label" style={{flex:1}}>{item.label}</span>
-            {item.badge&&<span className="sidebar-label" style={{background:item.bc,color:item.bc===T.yellow?"#000":"#fff",borderRadius:20,padding:"1px 7px",fontSize:10,fontWeight:700}}>{item.badge}</span>}
-            {view===item.id&&!item.badge&&<div className="sidebar-label" style={{width:5,height:5,borderRadius:"50%",background:T.accent,flexShrink:0}}/>}
-          </button>
-        ))}
-      </nav>
-      <div style={{padding:"10px 10px 6px",borderTop:"1px solid rgba(255,255,255,0.1)"}}>
-        <div style={{display:"flex",alignItems:"center",gap:8,padding:"9px 8px",borderRadius:10,background:"rgba(255,255,255,0.07)",marginBottom:6,cursor:"pointer",transition:"background 0.12s"}} onClick={()=>setModal("account")} title="Configuración de cuenta">
-          <div style={{width:32,height:32,borderRadius:8,background:ROLE_BADGE_COLOR[role]||T.muted,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:13,fontWeight:700,color:"#fff",boxShadow:`0 2px 6px ${ROLE_BADGE_COLOR[role]||T.muted}50`}}>{user.fullName?.[0]?.toUpperCase()||"?"}</div>
-          <div className="sidebar-label" style={{flex:1,minWidth:0}}>
-            <div style={{fontSize:12,fontWeight:600,color:"#fff",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{user.fullName}</div>
-            <div style={{fontSize:10,color:"rgba(255,255,255,0.45)"}}>{ROLE_BADGE_LABEL[role]||role}</div>
-          </div>
-          <button onClick={e=>{e.stopPropagation();handleLogout()}} title="Cerrar sesión" style={{background:"rgba(255,255,255,0.1)",border:"none",borderRadius:7,color:"rgba(255,255,255,0.65)",cursor:"pointer",padding:"6px 7px",display:"flex",transition:"background 0.12s"}}>
-            <Ic n="logout" s={14}/>
-          </button>
-        </div>
-        <button onClick={()=>{if(configured&&!syncing)doSync()}} disabled={!configured||syncing} style={{width:"100%",padding:"8px",borderRadius:8,fontFamily:"inherit",background:connected===true&&!syncing?"rgba(10,158,118,0.15)":connected===false?"rgba(220,53,69,0.15)":"rgba(255,255,255,0.05)",border:`1px solid ${syncColor}`,color:syncColor,cursor:!configured||syncing?"not-allowed":"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6,fontSize:12,fontWeight:600,opacity:!configured?0.4:1,marginBottom:autoSyncInterval>0&&syncCountdown>0?0:6}}>
-          <Ic n="sync" s={13} spin={syncing}/>
-          {syncing?"Sincronizando…":connected===false?"Reintentar":connected===true?`Sync · ${lastSync}`:"Sincronizar"}
-        </button>
-        {autoSyncInterval>0&&syncCountdown>0&&<div style={{fontSize:10,color:"rgba(255,255,255,0.4)",textAlign:"center",padding:"3px 0 6px",fontVariantNumeric:"tabular-nums"}}>Próxima sync en {fmtCountdown(syncCountdown)}</div>}
-        {!online&&<div style={{fontSize:10,color:T.orange,textAlign:"center",padding:"4px 0",fontWeight:600}}>Sin conexión{queueCount>0?` · ${queueCount} pendiente${queueCount>1?"s":""}`:""}</div>}
-        {syncErr&&<div style={{marginTop:2,fontSize:10,color:T.red,textAlign:"center",lineHeight:1.4,wordBreak:"break-word",marginBottom:6}}>{syncErr.slice(0,80)}</div>}
-        {cachedAt&&<div style={{fontSize:10,color:T.yellow,textAlign:"center",lineHeight:1.4,marginBottom:6}}>Caché: {new Date(cachedAt).toLocaleString("es-ES",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})}</div>}
-      </div>
-    </>
-  )
-
   return (
-    <div style={{fontFamily:"'IBM Plex Sans',sans-serif",background:T.bg,minHeight:"100vh",color:T.text,display:"flex"}}>
-      <aside className="sidebar-desktop" style={{width:240,background:T.brand,display:"flex",flexDirection:"column",position:"sticky",top:0,height:"100vh",flexShrink:0,zIndex:10}}>
-        <SidebarContent/>
+    <div style={{fontFamily:"'IBM Plex Sans',sans-serif",background:T.bg,minHeight:"100vh",color:T.text}}>
+      {/* ── Fixed Header ── */}
+      <header style={{position:"fixed",top:0,left:0,right:0,height:56,background:T.brand,display:"flex",alignItems:"center",gap:10,padding:"0 16px",zIndex:200,boxShadow:"0 2px 8px rgba(3,70,80,0.18)"}}>
+        <button className="app-hamburger" onClick={()=>setSideOpen(s=>!s)} style={{background:"rgba(255,255,255,0.1)",border:"none",borderRadius:8,color:"#fff",cursor:"pointer",padding:"7px",display:"flex",alignItems:"center",flexShrink:0}}><Ic n="menu" s={18}/></button>
+        <div style={{width:32,height:32,borderRadius:8,background:T.accent,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Ic n="warehouse" s={16}/></div>
+        <span style={{fontSize:14,fontWeight:800,color:"#fff",whiteSpace:"nowrap"}}><span style={{color:"#5dd8e8"}}>rekor</span><span style={{color:"rgba(255,255,255,0.45)"}}>.es</span> StockIn</span>
+        <div className="header-location" style={{flex:1,textAlign:"center",fontSize:13,fontWeight:600,color:"rgba(255,255,255,0.7)"}}>
+          {activeConn?.name||""}
+        </div>
+        <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
+          <button onClick={()=>{if(configured&&!syncing)doSync()}} disabled={!configured||syncing} title="Sincronizar" style={{background:"rgba(255,255,255,0.1)",border:"none",borderRadius:7,color:syncColor,cursor:!configured||syncing?"not-allowed":"pointer",padding:"6px",display:"flex",opacity:!configured?0.4:1}}>
+            <Ic n="sync" s={15} spin={syncing}/>
+          </button>
+          <button onClick={()=>navigate("alertas")} title="Alertas de stock" style={{position:"relative",background:"rgba(255,255,255,0.1)",border:"none",borderRadius:7,color:"rgba(255,255,255,0.85)",cursor:"pointer",padding:"6px",display:"flex"}}>
+            <Ic n="bell" s={15}/>
+            {alertas.length>0&&<span style={{position:"absolute",top:2,right:2,width:7,height:7,borderRadius:"50%",background:T.red}}/>}
+          </button>
+          <div style={{width:32,height:32,borderRadius:8,background:ROLE_BADGE_COLOR[role]||T.muted,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:700,color:"#fff",flexShrink:0,cursor:"pointer"}} onClick={()=>setModal("account")} title="Cuenta">
+            {user.fullName?.[0]?.toUpperCase()||"?"}
+          </div>
+          <span className="header-uname" style={{fontSize:12,fontWeight:600,color:"rgba(255,255,255,0.85)"}}>{user.fullName||user.username}</span>
+          <button onClick={handleLogout} title="Cerrar sesión" style={{background:"rgba(255,255,255,0.1)",border:"none",borderRadius:6,color:"rgba(255,255,255,0.65)",cursor:"pointer",padding:"6px",display:"flex"}}><Ic n="logout" s={14}/></button>
+        </div>
+      </header>
+
+      {/* ── Fixed Sidebar ── */}
+      <aside className="app-sidebar" style={{position:"fixed",top:56,left:0,bottom:0,width:SW,background:"#fff",borderRight:"1px solid #dde7e9",display:"flex",flexDirection:"column",zIndex:150,transition:"width 0.2s ease",overflow:"hidden"}}>
+        {!sideCollapsed&&PERMS.canManageConns(role)&&(
+          <div style={{padding:"10px 10px 0"}}>
+            <ConnectionSelector connections={connections} activeId={activeId} onSwitch={switchConn} onCreate={()=>setModal("new-conn")} onManage={()=>setModal("manage-conn")}/>
+          </div>
+        )}
+        {!sideCollapsed&&activeConn?.mode==="acms"&&activeConn.workplaces?.length>0&&(
+          <WorkplaceSelector workplaces={activeConn.workplaces} activeId={activeConn.activeWorkplace} onChange={switchWorkplace}/>
+        )}
+        <nav style={{flex:1,padding:"10px 8px",overflowY:"auto"}}>
+          {NAV_ITEMS.map(item=>(
+            <button key={item.id} data-active={view===item.id?"true":"false"} onClick={()=>navigate(item.id)} className="app-nav-btn" title={sideCollapsed?item.label:""} style={{width:"100%",display:"flex",alignItems:"center",gap:sideCollapsed?0:9,padding:sideCollapsed?"9px 0":"9px 12px",justifyContent:sideCollapsed?"center":"flex-start",borderRadius:9,border:"none",cursor:"pointer",marginBottom:2,fontFamily:"inherit",background:view===item.id?"#0592A7":"transparent",color:view===item.id?"#fff":"#034650",fontSize:13,fontWeight:view===item.id?600:400,textAlign:"left",transition:"background 0.12s,color 0.12s"}}>
+              <Ic n={item.icon} s={sideCollapsed?18:15}/>
+              {!sideCollapsed&&<span style={{flex:1}}>{item.label}</span>}
+              {!sideCollapsed&&item.badge&&<span style={{background:item.bc,color:item.bc===T.yellow?"#000":"#fff",borderRadius:20,padding:"1px 7px",fontSize:10,fontWeight:700}}>{item.badge}</span>}
+            </button>
+          ))}
+        </nav>
+        {!sideCollapsed&&(
+          <div style={{padding:"8px 10px 6px",borderTop:"1px solid #dde7e9",fontSize:10,color:T.muted}}>
+            <button onClick={()=>{if(configured&&!syncing)doSync()}} disabled={!configured||syncing} style={{width:"100%",padding:"7px 8px",borderRadius:8,fontFamily:"inherit",background:connected===true&&!syncing?"rgba(10,158,118,0.08)":connected===false?"rgba(220,53,69,0.08)":"transparent",border:`1px solid ${connected===true&&!syncing?T.green:connected===false?T.red:T.border}`,color:connected===true&&!syncing?T.green:connected===false?T.red:T.muted,cursor:!configured||syncing?"not-allowed":"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6,fontSize:11,fontWeight:600,opacity:!configured?0.4:1,marginBottom:2}}>
+              <Ic n="sync" s={12} spin={syncing}/>
+              {syncing?"Sincronizando…":connected===false?"Reintentar":connected===true?`Sync · ${lastSync}`:"Sincronizar"}
+            </button>
+            {autoSyncInterval>0&&syncCountdown>0&&<div style={{textAlign:"center",padding:"2px 0 4px",fontVariantNumeric:"tabular-nums"}}>Auto sync en {fmtCountdown(syncCountdown)}</div>}
+            {!online&&<div style={{color:T.orange,textAlign:"center",padding:"3px 0",fontWeight:600}}>Sin conexión{queueCount>0?` · ${queueCount} pend.`:""}</div>}
+            {syncErr&&<div style={{color:T.red,textAlign:"center",lineHeight:1.4,wordBreak:"break-word",marginBottom:4}}>{syncErr.slice(0,60)}</div>}
+            {cachedAt&&<div style={{color:T.yellow,textAlign:"center",lineHeight:1.4,marginBottom:4}}>Caché: {new Date(cachedAt).toLocaleString("es-ES",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})}</div>}
+          </div>
+        )}
+        <button onClick={toggleSidebar} style={{width:"100%",padding:"10px",borderTop:"1px solid #dde7e9",background:"none",borderLeft:"none",borderRight:"none",borderBottom:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:sideCollapsed?"center":"flex-start",gap:6,fontSize:12,fontWeight:600,color:"#6b8f95",fontFamily:"inherit"}}>
+          {sideCollapsed?<ChevronRight size={16}/>:<><ChevronLeft size={16}/><span>Contraer</span></>}
+        </button>
       </aside>
+
+      {/* ── Mobile drawer overlay ── */}
       {sideOpen&&(
-        <div style={{position:"fixed",inset:0,zIndex:200,display:"flex"}}>
-          <div style={{width:260,background:T.brand,display:"flex",flexDirection:"column",height:"100%",animation:"slideRight 0.22s ease"}}><SidebarContent/></div>
-          <div style={{flex:1,background:"rgba(3,70,80,0.5)"}} onClick={()=>setSideOpen(false)}/>
+        <div style={{position:"fixed",inset:0,zIndex:300,display:"flex"}} onClick={()=>setSideOpen(false)}>
+          <div style={{width:260,background:"#fff",display:"flex",flexDirection:"column",height:"100%",borderRight:"1px solid #dde7e9",animation:"slideRight 0.22s ease"}} onClick={e=>e.stopPropagation()}>
+            {PERMS.canManageConns(role)&&(
+              <div style={{padding:"10px 10px 0"}}>
+                <ConnectionSelector connections={connections} activeId={activeId} onSwitch={switchConn} onCreate={()=>setModal("new-conn")} onManage={()=>setModal("manage-conn")}/>
+              </div>
+            )}
+            {activeConn?.mode==="acms"&&activeConn.workplaces?.length>0&&(
+              <WorkplaceSelector workplaces={activeConn.workplaces} activeId={activeConn.activeWorkplace} onChange={switchWorkplace}/>
+            )}
+            <nav style={{flex:1,padding:"10px 8px",overflowY:"auto",marginTop:8}}>
+              {NAV_ITEMS.map(item=>(
+                <button key={item.id} data-active={view===item.id?"true":"false"} onClick={()=>navigate(item.id)} className="app-nav-btn" style={{width:"100%",display:"flex",alignItems:"center",gap:9,padding:"9px 12px",borderRadius:9,border:"none",cursor:"pointer",marginBottom:2,fontFamily:"inherit",background:view===item.id?"#0592A7":"transparent",color:view===item.id?"#fff":"#034650",fontSize:13,fontWeight:600,textAlign:"left"}}>
+                  <Ic n={item.icon} s={15}/><span style={{flex:1}}>{item.label}</span>
+                  {item.badge&&<span style={{background:item.bc,color:item.bc===T.yellow?"#000":"#fff",borderRadius:20,padding:"1px 7px",fontSize:10,fontWeight:700}}>{item.badge}</span>}
+                </button>
+              ))}
+            </nav>
+          </div>
+          <div style={{flex:1,background:"rgba(3,70,80,0.5)"}}/>
         </div>
       )}
-      <main style={{flex:1,overflow:"auto",minWidth:0}}>
-        <div className="topbar-mobile" style={{display:"none",alignItems:"center",gap:10,padding:"0 16px",height:52,background:T.brand,position:"sticky",top:0,zIndex:100,borderBottom:"1px solid rgba(255,255,255,0.1)",boxShadow:"0 2px 8px rgba(3,70,80,0.25)"}}>
-          <button onClick={()=>setSideOpen(true)} style={{background:"rgba(255,255,255,0.12)",border:"none",borderRadius:8,color:"#fff",cursor:"pointer",padding:"7px",display:"flex"}}><Ic n="menu" s={18}/></button>
-          <div style={{flex:1,fontSize:14,fontWeight:800,color:"#fff"}}><span style={{color:"#5dd8e8"}}>rekor</span><span style={{color:"rgba(255,255,255,0.35)"}}>.es</span><span style={{fontWeight:600,fontSize:13,color:"rgba(255,255,255,0.8)",marginLeft:6}}>StockIn</span></div>
-          <div style={{display:"flex",alignItems:"center",gap:5,fontSize:11,fontWeight:600,color:online?T.green:T.orange}}>
-            <div style={{width:6,height:6,borderRadius:"50%",background:online?T.green:T.orange,animation:!online?"pulse 1.5s infinite":"none"}}/>
-            {!online&&"Offline"}
-          </div>
-          <button onClick={()=>{if(configured&&!syncing)doSync()}} style={{background:"none",border:"none",cursor:"pointer",color:syncColor,display:"flex",padding:4}}><Ic n="sync" s={18} spin={syncing}/></button>
-        </div>
+
+      {/* ── Main content area ── */}
+      <div className="app-main" style={{paddingTop:56,marginLeft:SW,transition:"margin-left 0.2s ease",minHeight:"100vh"}}>
         {!online&&<div style={{background:"rgba(234,108,0,0.1)",borderBottom:`2px solid ${T.orange}`,padding:"7px 20px",display:"flex",alignItems:"center",justifyContent:"center",gap:10,fontSize:12,fontWeight:600,color:T.orange}}>
           ⚠ Sin conexión — trabajando con datos en caché. Las acciones se sincronizarán al reconectar.
           {queueCount>0&&<span style={{background:T.orange,color:"#fff",borderRadius:12,padding:"2px 8px",fontSize:11}}>{queueCount} pendiente{queueCount>1?"s":""}</span>}
@@ -2529,19 +2582,14 @@ export default function App() {
         {showBanner&&<div style={{background:T.green,color:"#fff",padding:"9px 20px",display:"flex",alignItems:"center",justifyContent:"center",gap:8,fontSize:13,fontWeight:600,animation:"slideDown 0.3s ease"}}>
           ✓ Conexión restaurada{queueCount>0?` · sincronizando ${queueCount} acción${queueCount>1?"es":""}…`:""}
         </div>}
-        {/* Ágora failing banner — shown for all non-camarero roles when connection is failing */}
         {agoraState==="failing"&&online&&<AgoraBanner failingSince={failingSince} onRetry={()=>{consecutiveFailures.current=0;doSync()}} syncing={syncing}/>}
         <div style={{padding:"24px 28px"}} className="main-pad">
           {notif&&<div style={{position:"fixed",top:16,right:16,zIndex:400,maxWidth:380,background:notif.type==="ok"?"#f0fdf8":notif.type==="warn"?"#fffbeb":"#fff5f5",border:`1px solid ${notif.type==="ok"?T.green:notif.type==="warn"?T.yellow:T.red}`,borderRadius:10,padding:"11px 16px",display:"flex",alignItems:"center",gap:10,color:notif.type==="ok"?T.green:notif.type==="warn"?T.yellow:T.red,fontSize:13,fontWeight:500,boxShadow:"0 4px 20px rgba(3,70,80,0.12)",animation:"slideIn 0.2s ease"}}>
             <Ic n={notif.type==="ok"?"check":"alert"} s={15}/>{notif.msg}
           </div>}
-          {/* Admin-only: Mi equipo (Ágora employees mapped to StockIn roles) */}
           {view==="miequipo"&&PERMS.canManageTeam(role)&&<MiEquipoView conn={activeConn} toast={toast}/>}
-          {/* Informe mensual */}
           {view==="informe"&&canSeeNav("informe")&&<MonthlyReport stockRows={stockRows} albaranes={albaranes} alertas={alertas} conn={activeConn} toast={toast}/>}
-          {/* Waiting screen when Ágora not configured (admin/encargado/camarero) */}
           {view!=="miequipo"&&view!=="informe"&&agoraState==="unconfigured"&&<WaitingScreen/>}
-          {/* Main modules — requires connection (or demo mode) */}
           {view!=="miequipo"&&view!=="informe"&&agoraState!=="unconfigured"&&(configured||isDemo)&&<>
             {!isDemo&&syncing&&!products.length&&<LoadingScreen/>}
             {!isDemo&&!syncing&&connected===false&&!products.length&&!cachedAt&&<ErrorScreen error={syncErr} onRetry={()=>doSync()}/>}
@@ -2559,7 +2607,8 @@ export default function App() {
             </>}
           </>}
         </div>
-      </main>
+      </div>
+
       {modal==="new-conn"&&<Modal title="Nueva conexión con Ágora" onClose={()=>setModal(null)}><ConnectionForm onSave={saveNewConn} onCancel={()=>setModal(null)} toast={toast}/></Modal>}
       {modal==="edit-conn"&&editConn&&<Modal title="Editar conexión" onClose={()=>{setModal(null);setEditConn(null)}}><ConnectionForm initial={editConn} onSave={saveEditConn} onCancel={()=>{setModal(null);setEditConn(null)}} toast={toast}/></Modal>}
       {modal==="manage-conn"&&<Modal title="Gestionar conexiones" onClose={()=>setModal(null)}>
@@ -2594,10 +2643,15 @@ export default function App() {
         .app-table tbody tr{transition:background 0.07s}
         .app-table tbody tr:hover>td{background:#f4f9fa !important}
         /* ── Sidebar nav ── */
-        .app-nav-btn:hover{background:rgba(255,255,255,0.09) !important;color:rgba(255,255,255,0.85) !important}
+        .app-hamburger{display:none}
+        .app-nav-btn:hover:not(:disabled){background:rgba(5,146,167,0.08) !important;color:#034650 !important}
+        .app-nav-btn[data-active="true"]:hover{background:#046f80 !important;color:#fff !important}
         @media(max-width:768px){
-          .sidebar-desktop{display:none !important}
-          .topbar-mobile{display:flex !important}
+          .app-hamburger{display:flex !important}
+          .app-sidebar{display:none !important}
+          .app-main{margin-left:0 !important;transition:none !important}
+          .header-uname{display:none !important}
+          .header-location{display:none !important}
           .main-pad{padding:12px 12px !important}
           button{min-height:44px}
           input,select,textarea{font-size:16px !important}
@@ -2605,7 +2659,6 @@ export default function App() {
           .hide-xs{display:none !important}
           .page-header-wrap{flex-direction:column;align-items:flex-start !important}
           .card-grid{grid-template-columns:1fr !important}
-          /* Card-style table transformation */
           .app-table-card thead{display:none}
           .app-table-card,
           .app-table-card tbody{display:block;width:100%}
@@ -2646,12 +2699,7 @@ export default function App() {
           .modal-inner{max-width:100% !important;margin:0 !important;border-radius:12px 12px 0 0 !important}
           .grid-2col{grid-template-columns:1fr !important}
         }
-        @media(min-width:769px) and (max-width:1024px){
-          .sidebar-desktop{width:60px !important}
-          .sidebar-label{display:none !important}
-          .sidebar-logo-text{display:none !important}
-        }
-        @media(min-width:769px){.topbar-mobile{display:none !important}}
+        @media(min-width:769px){.app-hamburger{display:none !important}}
       `}</style>
     </div>
   )
