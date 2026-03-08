@@ -145,14 +145,11 @@ function DistributorDetail({ dist, onBack, toast }) {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [lRes, uRes] = await Promise.all([
-        saAPI.getLocations(`?distributorId=${dist.id}`),
-        saAPI.getSaUsers(`?distributorId=${dist.id}`),
-      ])
+      const lRes = await saAPI.getLocations(`?distributorId=${dist.id}`)
       setLocations(Array.isArray(lRes) ? lRes : [])
-      setUsers(Array.isArray(uRes) ? uRes : [])
     } catch (e) { toast(e.message, 'err') }
     setLoading(false)
+    saAPI.getSaUsers(`?distributorId=${dist.id}`).then(r => { if (Array.isArray(r)) setUsers(r) }).catch(() => {})
   }, [dist.id])
 
   useEffect(() => { load() }, [load])
@@ -409,11 +406,11 @@ function LocalesModule({ toast }) {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [lRes, dRes] = await Promise.all([saAPI.getLocations(), saAPI.getDistributors()])
+      const lRes = await saAPI.getLocations()
       setItems(Array.isArray(lRes) ? lRes : [])
-      setDistributors(Array.isArray(dRes) ? dRes : [])
     } catch (e) { toast(e.message, 'err') }
     setLoading(false)
+    saAPI.getDistributors().then(r => { if (Array.isArray(r)) setDistributors(r) }).catch(() => {})
   }, [])
 
   useEffect(() => { load() }, [load])
