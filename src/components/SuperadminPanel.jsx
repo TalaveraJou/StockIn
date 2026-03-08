@@ -49,18 +49,19 @@ const Ic = ({ n, s = 18, style: sx = {} }) => {
 // ── Shared UI ─────────────────────────────────────────────────────────────────
 function Btn({ onClick, disabled, children, variant = 'primary', small, style: sx = {} }) {
   const styles = {
-    primary:   { background: T.accent,  color: '#fff',   border: 'none' },
-    brand:     { background: T.brand,   color: '#fff',   border: 'none' },
+    primary:   { background: T.accent,  color: '#fff',   border: 'none',   boxShadow: '0 1px 4px rgba(5,146,167,0.25)' },
+    brand:     { background: T.brand,   color: '#fff',   border: 'none',   boxShadow: '0 1px 4px rgba(3,70,80,0.25)' },
     secondary: { background: '#f0f4f5', color: T.text,   border: `1px solid ${T.border}` },
-    danger:    { background: 'rgba(220,53,69,0.08)', color: T.red,   border: '1px solid rgba(220,53,69,0.2)' },
-    success:   { background: 'rgba(10,158,118,0.1)', color: T.green, border: '1px solid rgba(10,158,118,0.25)' },
+    danger:    { background: 'rgba(220,53,69,0.08)', color: T.red,    border: '1px solid rgba(220,53,69,0.2)' },
+    success:   { background: 'rgba(10,158,118,0.1)', color: T.green,  border: '1px solid rgba(10,158,118,0.25)' },
     warn:      { background: 'rgba(217,119,6,0.1)',  color: T.yellow, border: '1px solid rgba(217,119,6,0.25)' },
   }
   return (
     <button
       onClick={!disabled ? onClick : undefined}
       disabled={disabled}
-      style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: small ? '6px 12px' : '9px 18px', borderRadius: 8, cursor: disabled ? 'not-allowed' : 'pointer', fontSize: small ? 12 : 13, fontWeight: 600, fontFamily: 'inherit', opacity: disabled ? 0.45 : 1, transition: 'opacity 0.15s', ...styles[variant], ...sx }}
+      className={`sa-btn sa-btn-${variant}`}
+      style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: small ? '5px 11px' : '9px 18px', borderRadius: 8, cursor: disabled ? 'not-allowed' : 'pointer', fontSize: small ? 12 : 13, fontWeight: 600, fontFamily: 'inherit', opacity: disabled ? 0.45 : 1, transition: 'filter 0.12s, box-shadow 0.12s, transform 0.1s', ...styles[variant], ...sx }}
     >
       {children}
     </button>
@@ -69,11 +70,11 @@ function Btn({ onClick, disabled, children, variant = 'primary', small, style: s
 
 function Modal({ title, onClose, children, maxW = 560 }) {
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 300, background: 'rgba(3,70,80,0.4)', backdropFilter: 'blur(3px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ background: '#fff', borderRadius: 14, border: `1px solid ${T.border}`, width: '100%', maxWidth: maxW, maxHeight: '90vh', overflow: 'auto', padding: 24, boxShadow: '0 20px 60px rgba(3,70,80,0.18)' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+    <div style={{ position: 'fixed', inset: 0, zIndex: 300, background: 'rgba(3,70,80,0.45)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      <div className="sa-modal-inner" style={{ background: '#fff', borderRadius: 16, border: `1px solid ${T.border}`, width: '100%', maxWidth: maxW, maxHeight: '92vh', overflow: 'auto', padding: 24, boxShadow: '0 24px 64px rgba(3,70,80,0.22)', animation: 'fadeUp 0.18s ease' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, paddingBottom: 14, borderBottom: `1px solid ${T.border}` }}>
           <h2 style={{ fontSize: 16, fontWeight: 700, color: T.brand, margin: 0 }}>{title}</h2>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: T.muted, cursor: 'pointer', padding: 4, borderRadius: 6, display: 'flex' }}><Ic n="close" s={17} /></button>
+          <button onClick={onClose} style={{ background: `${T.bg}`, border: `1px solid ${T.border}`, color: T.muted, cursor: 'pointer', padding: '5px 7px', borderRadius: 8, display: 'flex', transition: 'background 0.1s' }}><Ic n="close" s={15} /></button>
         </div>
         {children}
       </div>
@@ -186,7 +187,7 @@ function DistributorForm({ initial, onSave, onCancel, saving }) {
         <LogoPicker value={form.logo} name={form.name} onChange={v => set('logo', v)} />
       </Field>
       <Field label="Nombre *"><input style={S.inp} value={form.name} onChange={e => set('name', e.target.value)} placeholder="Nombre del distribuidor" /></Field>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+      <div className="sa-g2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
         <Field label="Email de contacto"><input style={S.inp} type="email" value={form.contactEmail} onChange={e => set('contactEmail', e.target.value)} placeholder="email@ejemplo.com" /></Field>
         <Field label="Teléfono"><input style={S.inp} value={form.contactPhone} onChange={e => set('contactPhone', e.target.value)} placeholder="+34 600 000 000" /></Field>
       </div>
@@ -261,8 +262,8 @@ function DistributorDetail({ dist, onBack, toast }) {
       {loading ? <div style={{ color: T.muted, fontSize: 13, padding: 20 }}>Cargando…</div> : (
         tab === 'locales' ? (
           locations.length === 0 ? <Empty msg="No hay locales para este distribuidor." /> : (
-            <div style={{ ...S.card, padding: 0, overflow: 'hidden' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <div className="sa-table-wrap" style={{ ...S.card, padding: 0, overflowX: 'auto' }}>
+              <table className="sa-table" style={{ width: '100%', borderCollapse: 'collapse', minWidth: 520 }}>
                 <thead><tr><th style={thSt}>Local</th><th style={thSt}>Ciudad</th><th style={thSt}>Estado</th><th style={thSt} /></tr></thead>
                 <tbody>
                   {locations.map(loc => (
@@ -283,8 +284,8 @@ function DistributorDetail({ dist, onBack, toast }) {
           )
         ) : (
           users.length === 0 ? <Empty msg="No hay usuarios para este distribuidor." /> : (
-            <div style={{ ...S.card, padding: 0, overflow: 'hidden' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <div className="sa-table-wrap" style={{ ...S.card, padding: 0, overflowX: 'auto' }}>
+              <table className="sa-table" style={{ width: '100%', borderCollapse: 'collapse', minWidth: 520 }}>
                 <thead><tr><th style={thSt}>Usuario</th><th style={thSt}>Rol</th><th style={thSt}>Local</th><th style={thSt} /></tr></thead>
                 <tbody>
                   {users.map(u => (
@@ -363,9 +364,9 @@ function DistribuidoresModule({ toast }) {
       {loading ? <div style={{ color: T.muted, fontSize: 13 }}>Cargando…</div> : items.length === 0 ? (
         <Empty msg="No hay distribuidores. Crea el primero." />
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(300px,1fr))', gap: 16 }}>
+        <div className="sa-dist-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(280px,1fr))', gap: 16 }}>
           {items.map(d => (
-            <div key={d.id} style={{ ...S.card, display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div key={d.id} className="sa-card" style={{ ...S.card, display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
                 <div style={{ width: 40, height: 40, borderRadius: 10, background: d.logo ? '#fff' : (d.status === 'suspended' ? '#fee2e2' : T.brand), border: d.logo ? `1px solid ${T.border}` : 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', color: d.status === 'suspended' ? T.red : '#fff', fontSize: 16, fontWeight: 700, flexShrink: 0, overflow: 'hidden' }}>
                   {d.logo ? <img src={d.logo} alt={d.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : (d.name?.[0]?.toUpperCase() || 'D')}
@@ -445,7 +446,7 @@ function SyncSummaryPanel({ summary, status, msg, onRetry, canRetry }) {
         )}
       </div>
       {isOk && summary && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+        <div className="sa-sync-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
           {SYNC_LABELS.filter(s => summary[s.key] !== undefined).map(({ key, label, icon }) => (
             <div key={key} style={{ background: '#fff', borderRadius: 8, padding: '8px 10px', border: `1px solid ${T.border}`, textAlign: 'center' }}>
               <div style={{ fontSize: 11, color: T.muted, marginBottom: 2 }}>{icon} {label}</div>
@@ -482,7 +483,7 @@ function LocationForm({ initial, distributors, onSave, onCancel, saving }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <Field label="Nombre del local *"><input style={S.inp} value={form.name} onChange={e => set('name', e.target.value)} placeholder="Bar Ejemplo" /></Field>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+      <div className="sa-g2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
         <Field label="Ciudad"><input style={S.inp} value={form.city} onChange={e => set('city', e.target.value)} placeholder="Madrid" /></Field>
         <Field label="Distribuidor *">
           <select style={S.inp} value={form.distributorId} onChange={e => set('distributorId', e.target.value)}>
@@ -502,8 +503,8 @@ function LocationForm({ initial, distributors, onSave, onCancel, saving }) {
             <input style={S.inp} value={form.agoraUrl} onChange={e => set('agoraUrl', e.target.value)} placeholder="http://192.168.1.10:8984" />
           </Field>
           <Field label="API Token de Ágora">
-            <div style={{ display: 'flex', gap: 8 }}>
-              <div style={{ position: 'relative', flex: 1 }}>
+            <div className="sa-token-row" style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+              <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
                 <input style={{ ...S.inp, paddingRight: 40 }} type={showToken ? 'text' : 'password'} value={form.apiToken} onChange={e => set('apiToken', e.target.value)} placeholder="Token de Ágora" />
                 <button type="button" onClick={() => setShowToken(s => !s)} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: T.muted, display: 'flex', alignItems: 'center' }}>
                   {showToken ? <EyeOff size={16}/> : <Eye size={16}/>}
@@ -648,8 +649,8 @@ function LocalesModule({ toast }) {
       {loading ? <div style={{ color: T.muted, fontSize: 13 }}>Cargando…</div> : filtered.length === 0 ? (
         <Empty msg={items.length === 0 ? 'No hay locales registrados.' : 'No hay resultados para los filtros aplicados.'} />
       ) : (
-        <div style={{ ...S.card, padding: 0, overflow: 'hidden' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <div className="sa-table-wrap" style={{ ...S.card, padding: 0, overflowX: 'auto' }}>
+          <table className="sa-table" style={{ width: '100%', borderCollapse: 'collapse', minWidth: 520 }}>
             <thead>
               <tr>
                 <th style={thSt}>Local</th>
@@ -796,13 +797,13 @@ function UserForm({ initial, distributors, locations, onSave, onCancel, saving }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+      <div className="sa-g2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
         <Field label="Nombre completo *"><input style={S.inp} value={form.fullName} onChange={e => set('fullName', e.target.value)} placeholder="Nombre y apellido" /></Field>
         <Field label="Email / Usuario *"><input style={S.inp} value={form.username} onChange={e => set('username', e.target.value)} placeholder="usuario@ejemplo.com" /></Field>
       </div>
 
       {/* Password fields */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+      <div className="sa-g2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
         <Field label={isNew ? 'Contraseña *' : 'Nueva contraseña (vacío = no cambiar)'}>
           <div style={{ position: 'relative' }}>
             <input
@@ -833,7 +834,7 @@ function UserForm({ initial, distributors, locations, onSave, onCancel, saving }
       </div>
       {pwErr && <div style={{ fontSize: 12, color: T.red, marginTop: -8 }}>{pwErr}</div>}
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+      <div className="sa-g2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
         <Field label="Rol">
           <select style={S.inp} value={form.role} onChange={e => set('role', e.target.value)}>
             <option value="admin">Admin — panel completo + Mi equipo</option>
@@ -1003,8 +1004,8 @@ function UsuariosModule({ toast }) {
       {loading ? <div style={{ color: T.muted, fontSize: 13 }}>Cargando…</div> : filtered.length === 0 ? (
         <Empty msg={items.length === 0 ? 'No hay usuarios registrados.' : 'No hay resultados.'} />
       ) : (
-        <div style={{ ...S.card, padding: 0, overflow: 'hidden' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <div className="sa-table-wrap" style={{ ...S.card, padding: 0, overflowX: 'auto' }}>
+          <table className="sa-table" style={{ width: '100%', borderCollapse: 'collapse', minWidth: 520 }}>
             <thead>
               <tr>
                 <th style={thSt}>Usuario</th>
@@ -1120,8 +1121,8 @@ function InformesModule({ toast }) {
 
       <h2 style={{ fontSize: 16, fontWeight: 700, color: T.brand, marginBottom: 14 }}>Registro de actividad</h2>
       {events.length === 0 ? <Empty msg="No hay eventos registrados." /> : (
-        <div style={{ ...S.card, padding: 0, overflow: 'hidden' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <div className="sa-table-wrap" style={{ ...S.card, padding: 0, overflowX: 'auto' }}>
+          <table className="sa-table" style={{ width: '100%', borderCollapse: 'collapse', minWidth: 520 }}>
             <thead>
               <tr>
                 <th style={thSt}>Fecha</th>
@@ -1199,7 +1200,7 @@ function ConfiguracionModule({ toast }) {
       <PageHeader title="Configuración global" subtitle="Ajustes globales del sistema StockIn." />
 
       <SectionTitle>Sesión y sincronización</SectionTitle>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+      <div className="sa-g2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
         <Field label="Timeout de sesión (minutos)" hint="Tiempo de inactividad antes de cerrar sesión automáticamente.">
           <input style={S.inp} type="number" min={15} max={1440} value={cfg.sessionTimeout ?? 480} onChange={e => set('sessionTimeout', parseInt(e.target.value) || 480)} />
         </Field>
@@ -1215,7 +1216,7 @@ function ConfiguracionModule({ toast }) {
           Activar alertas por WhatsApp
         </label>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, opacity: cfg.whatsapp?.enabled ? 1 : 0.45 }}>
+      <div className="sa-g2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, opacity: cfg.whatsapp?.enabled ? 1 : 0.45 }}>
         <Field label="API Key de CallMeBot">
           <input style={S.inp} value={cfg.whatsapp?.apikey ?? ''} onChange={e => set('whatsapp.apikey', e.target.value)} disabled={!cfg.whatsapp?.enabled} placeholder="xxxxxxxx" />
         </Field>
@@ -1232,15 +1233,15 @@ function ConfiguracionModule({ toast }) {
         </label>
       </div>
       <div style={{ opacity: cfg.email?.enabled ? 1 : 0.45, display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+        <div className="sa-g2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
           <Field label="Host SMTP"><input style={S.inp} value={cfg.email?.smtp?.host ?? ''} onChange={e => set('email.smtp.host', e.target.value)} disabled={!cfg.email?.enabled} placeholder="smtp.example.com" /></Field>
           <Field label="Puerto SMTP"><input style={S.inp} type="number" value={cfg.email?.smtp?.port ?? 587} onChange={e => set('email.smtp.port', parseInt(e.target.value))} disabled={!cfg.email?.enabled} /></Field>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+        <div className="sa-g2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
           <Field label="Usuario SMTP"><input style={S.inp} value={cfg.email?.smtp?.user ?? ''} onChange={e => set('email.smtp.user', e.target.value)} disabled={!cfg.email?.enabled} /></Field>
           <Field label="Contraseña SMTP"><input style={S.inp} type="password" value={cfg.email?.smtp?.pass ?? ''} onChange={e => set('email.smtp.pass', e.target.value)} disabled={!cfg.email?.enabled} /></Field>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+        <div className="sa-g2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
           <Field label="Nombre del remitente"><input style={S.inp} value={cfg.email?.senderName ?? ''} onChange={e => set('email.senderName', e.target.value)} disabled={!cfg.email?.enabled} placeholder="StockIn" /></Field>
           <Field label="Destinatarios (separados por coma)"><input style={S.inp} value={cfg.email?.recipients ?? ''} onChange={e => set('email.recipients', e.target.value)} disabled={!cfg.email?.enabled} placeholder="jefe@local.com, otro@local.com" /></Field>
         </div>
@@ -1322,7 +1323,7 @@ function ChangelogModule({ toast }) {
         <div style={{ ...S.card, marginBottom: 14, border: `1.5px solid ${T.accent}` }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: T.accent, marginBottom: 12, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Nueva entrada</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <div className="sa-g2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
               <Field label="Título *">
                 <input style={S.inp} value={newItem.title} onChange={e => setNewItem(p => ({ ...p, title: e.target.value }))} placeholder="Nombre de la funcionalidad" />
               </Field>
@@ -1414,68 +1415,105 @@ export default function SuperadminPanel({ user, onLogout }) {
   const toast = (msg, type = 'ok') => { setNotif({ msg, type }); setTimeout(() => setNotif(null), 5000) }
 
   return (
-    <div style={{ fontFamily: "'IBM Plex Sans',sans-serif", background: T.bg, minHeight: '100vh', color: T.text, display: 'flex' }}>
-      {/* Sidebar */}
-      <aside style={{ width: 230, background: T.brand, display: 'flex', flexDirection: 'column', position: 'sticky', top: 0, height: '100vh', flexShrink: 0 }}>
-        {/* Logo */}
-        <div style={{ padding: '16px 14px 12px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-            <div style={{ width: 34, height: 34, borderRadius: 9, background: T.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <Ic n="settings" s={17} />
-            </div>
-            <div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: '#fff', letterSpacing: '-0.2px' }}><span style={{ color: T.accent }}>rekor</span><span style={{ color: 'rgba(255,255,255,0.45)' }}>.es</span></div>
-              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>SuperAdmin</div>
+    <div style={{ fontFamily: "'IBM Plex Sans',sans-serif", background: T.bg, minHeight: '100vh', color: T.text, display: 'flex', flexDirection: 'column' }}>
+
+      {/* ── Mobile top header (hidden on desktop via CSS) ── */}
+      <header className="sa-mob-header" style={{ display: 'none', position: 'sticky', top: 0, zIndex: 250, background: T.brand, flexShrink: 0, padding: '0 16px', height: 52, alignItems: 'center', justifyContent: 'space-between', boxShadow: '0 2px 8px rgba(3,70,80,0.25)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ width: 28, height: 28, borderRadius: 7, background: T.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <Ic n="settings" s={14} />
+          </div>
+          <span style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>
+            <span style={{ color: '#5dd8e8' }}>rekor</span><span style={{ color: 'rgba(255,255,255,0.4)' }}>.es</span>
+            <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', marginLeft: 8, fontWeight: 500 }}>SuperAdmin</span>
+          </span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.7)' }}>{NAV.find(n => n.id === view)?.label}</span>
+          <button onClick={onLogout} title="Cerrar sesión" style={{ background: 'rgba(255,255,255,0.12)', border: 'none', borderRadius: 7, padding: '6px 8px', cursor: 'pointer', color: 'rgba(255,255,255,0.85)', display: 'flex', alignItems: 'center' }}>
+            <Ic n="logout" s={14} />
+          </button>
+        </div>
+      </header>
+
+      {/* ── Desktop layout: sidebar + main ── */}
+      <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
+
+        {/* Sidebar */}
+        <aside className="sa-sidebar" style={{ width: 234, background: T.brand, display: 'flex', flexDirection: 'column', position: 'sticky', top: 0, height: '100vh', flexShrink: 0 }}>
+          {/* Logo */}
+          <div style={{ padding: '18px 16px 14px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ width: 36, height: 36, borderRadius: 10, background: T.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 2px 8px rgba(5,146,167,0.4)' }}>
+                <Ic n="settings" s={17} />
+              </div>
+              <div>
+                <div style={{ fontSize: 15, fontWeight: 800, color: '#fff', letterSpacing: '-0.3px' }}><span style={{ color: '#5dd8e8' }}>rekor</span><span style={{ color: 'rgba(255,255,255,0.35)' }}>.es</span></div>
+                <div style={{ fontSize: 9.5, color: 'rgba(255,255,255,0.38)', letterSpacing: '0.12em', textTransform: 'uppercase', marginTop: 1 }}>Panel SuperAdmin</div>
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Nav */}
-        <nav style={{ flex: 1, padding: '10px 8px', overflowY: 'auto' }}>
-          {NAV.map(item => (
-            <button
-              key={item.id}
-              onClick={() => setView(item.id)}
-              style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '9px 10px', borderRadius: 8, border: 'none', cursor: 'pointer', marginBottom: 1, fontFamily: 'inherit', background: view === item.id ? 'rgba(255,255,255,0.12)' : 'transparent', color: view === item.id ? '#fff' : 'rgba(255,255,255,0.55)', fontSize: 13, fontWeight: view === item.id ? 600 : 400, textAlign: 'left' }}
-            >
-              <Ic n={item.icon} s={15} />
-              <span style={{ flex: 1 }}>{item.label}</span>
-            </button>
-          ))}
-        </nav>
+          {/* Nav */}
+          <nav style={{ flex: 1, padding: '10px 8px', overflowY: 'auto' }}>
+            {NAV.map(item => (
+              <button
+                key={item.id}
+                onClick={() => setView(item.id)}
+                className="sa-nav-btn"
+                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 9, padding: '9px 12px', borderRadius: 9, border: 'none', cursor: 'pointer', marginBottom: 2, fontFamily: 'inherit', background: view === item.id ? 'rgba(255,255,255,0.13)' : 'transparent', color: view === item.id ? '#fff' : 'rgba(255,255,255,0.52)', fontSize: 13, fontWeight: view === item.id ? 600 : 400, textAlign: 'left', transition: 'background 0.12s, color 0.12s', boxShadow: view === item.id ? 'inset 2px 0 0 #5dd8e8' : 'none' }}
+              >
+                <Ic n={item.icon} s={15} />
+                <span style={{ flex: 1 }}>{item.label}</span>
+                {view === item.id && <div style={{ width: 5, height: 5, borderRadius: '50%', background: T.accent, flexShrink: 0 }} />}
+              </button>
+            ))}
+          </nav>
 
-        {/* User + logout */}
-        <div style={{ padding: '10px 10px 14px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 6px', borderRadius: 8, background: 'rgba(255,255,255,0.07)' }}>
-            <div style={{ width: 32, height: 32, borderRadius: 8, background: T.purple, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 13, fontWeight: 700, color: '#fff' }}>
-              {user?.fullName?.[0]?.toUpperCase() || 'S'}
+          {/* User + logout */}
+          <div style={{ padding: '10px 10px 16px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 8px', borderRadius: 10, background: 'rgba(255,255,255,0.07)' }}>
+              <div style={{ width: 32, height: 32, borderRadius: 8, background: T.purple, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 13, fontWeight: 700, color: '#fff', boxShadow: '0 2px 6px rgba(124,58,237,0.35)' }}>
+                {user?.fullName?.[0]?.toUpperCase() || 'S'}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.fullName || 'Superadmin'}</div>
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)' }}>Super Admin</div>
+              </div>
+              <button onClick={onLogout} title="Cerrar sesión" style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 7, color: 'rgba(255,255,255,0.65)', cursor: 'pointer', padding: '6px 7px', display: 'flex', transition: 'background 0.12s' }}>
+                <Ic n="logout" s={14} />
+              </button>
             </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 12, fontWeight: 600, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.fullName || 'Superadmin'}</div>
-              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>Super Admin</div>
-            </div>
-            <button onClick={onLogout} title="Cerrar sesión" style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 6, color: 'rgba(255,255,255,0.6)', cursor: 'pointer', padding: 5, display: 'flex' }}>
-              <Ic n="logout" s={14} />
-            </button>
           </div>
-        </div>
-      </aside>
+        </aside>
 
-      {/* Main content */}
-      <main style={{ flex: 1, overflow: 'auto', minWidth: 0 }}>
-        <div style={{ padding: '28px 32px', maxWidth: 1100, margin: '0 auto' }}>
-          {view === 'distribuidores' && <DistribuidoresModule toast={toast} />}
-          {view === 'locales'        && <LocalesModule        toast={toast} />}
-          {view === 'usuarios'       && <UsuariosModule       toast={toast} />}
-          {view === 'informes'       && <InformesModule       toast={toast} />}
-          {view === 'changelog'      && <ChangelogModule      toast={toast} />}
-          {view === 'config'         && <ConfiguracionModule  toast={toast} />}
-        </div>
-      </main>
+        {/* Main content */}
+        <main className="sa-main" style={{ flex: 1, overflow: 'auto', minWidth: 0 }}>
+          <div className="sa-content" style={{ padding: '28px 32px', maxWidth: 1100, margin: '0 auto' }}>
+            {view === 'distribuidores' && <DistribuidoresModule toast={toast} />}
+            {view === 'locales'        && <LocalesModule        toast={toast} />}
+            {view === 'usuarios'       && <UsuariosModule       toast={toast} />}
+            {view === 'informes'       && <InformesModule       toast={toast} />}
+            {view === 'changelog'      && <ChangelogModule      toast={toast} />}
+            {view === 'config'         && <ConfiguracionModule  toast={toast} />}
+          </div>
+        </main>
+
+      </div>{/* end desktop layout */}
+
+      {/* ── Mobile bottom nav (hidden on desktop via CSS) ── */}
+      <nav className="sa-mob-nav" style={{ display: 'none', position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 250, background: T.brand, borderTop: '1px solid rgba(255,255,255,0.12)', padding: '6px 0', justifyContent: 'space-around', alignItems: 'center', boxShadow: '0 -2px 16px rgba(3,70,80,0.2)' }}>
+        {NAV.map(item => (
+          <button key={item.id} onClick={() => setView(item.id)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, background: view === item.id ? 'rgba(255,255,255,0.14)' : 'none', border: 'none', cursor: 'pointer', borderRadius: 10, color: view === item.id ? '#fff' : 'rgba(255,255,255,0.42)', padding: '5px 6px', flex: 1, minWidth: 0, fontFamily: 'inherit', transition: 'all 0.14s' }}>
+            <Ic n={item.icon} s={view === item.id ? 21 : 19} />
+            <span style={{ fontSize: 9, fontWeight: view === item.id ? 700 : 400, letterSpacing: '0.02em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>{item.label}</span>
+          </button>
+        ))}
+      </nav>
 
       {/* Toast notification */}
       {notif && (
-        <div style={{ position: 'fixed', top: 16, right: 16, zIndex: 400, maxWidth: 380, background: notif.type === 'ok' ? '#f0fdf8' : notif.type === 'warn' ? '#fffbeb' : '#fff5f5', border: `1px solid ${notif.type === 'ok' ? T.green : notif.type === 'warn' ? T.yellow : T.red}`, borderRadius: 10, padding: '11px 16px', display: 'flex', alignItems: 'center', gap: 10, color: notif.type === 'ok' ? T.green : notif.type === 'warn' ? T.yellow : T.red, fontSize: 13, fontWeight: 500, boxShadow: '0 4px 20px rgba(3,70,80,0.12)', animation: 'slideIn 0.2s ease' }}>
+        <div className="sa-toast" style={{ position: 'fixed', top: 16, right: 16, zIndex: 400, maxWidth: 380, background: notif.type === 'ok' ? '#f0fdf8' : notif.type === 'warn' ? '#fffbeb' : '#fff5f5', border: `1px solid ${notif.type === 'ok' ? T.green : notif.type === 'warn' ? T.yellow : T.red}`, borderRadius: 12, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 10, color: notif.type === 'ok' ? T.green : notif.type === 'warn' ? T.yellow : T.red, fontSize: 13, fontWeight: 500, boxShadow: '0 6px 24px rgba(3,70,80,0.15)', animation: 'slideIn 0.2s ease' }}>
           <Ic n={notif.type === 'ok' ? 'check' : 'warn'} s={15} />{notif.msg}
         </div>
       )}
@@ -1483,10 +1521,65 @@ export default function SuperadminPanel({ user, onLogout }) {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700;800&display=swap');
         *{box-sizing:border-box;margin:0;padding:0}
-        ::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-track{background:#f0f5f6}::-webkit-scrollbar-thumb{background:#c5d8db;border-radius:3px}
-        button:focus-visible{outline:2px solid #0592A7;outline-offset:2px}
-        input:focus,select:focus,textarea:focus{border-color:#0592A7 !important;box-shadow:0 0 0 3px rgba(5,146,167,0.12) !important;outline:none}
+        ::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-track{background:#f0f5f6}::-webkit-scrollbar-thumb{background:#c5d8db;border-radius:3px}::-webkit-scrollbar-thumb:hover{background:${T.accent}}
+        button:focus-visible{outline:2px solid ${T.accent};outline-offset:2px}
+        input:focus,select:focus,textarea:focus{border-color:${T.accent} !important;box-shadow:0 0 0 3px rgba(5,146,167,0.13) !important;outline:none}
+        @keyframes spin{to{transform:rotate(360deg)}}
         @keyframes slideIn{from{opacity:0;transform:translateX(14px)}to{opacity:1;transform:none}}
+        @keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+        /* Buttons */
+        .sa-btn{transition:filter 0.12s,box-shadow 0.12s,transform 0.1s !important}
+        .sa-btn:hover:not(:disabled){filter:brightness(0.92)}
+        .sa-btn:active:not(:disabled){transform:scale(0.97) !important}
+        .sa-btn-primary:hover:not(:disabled){box-shadow:0 4px 14px rgba(5,146,167,0.38) !important}
+        .sa-btn-brand:hover:not(:disabled){box-shadow:0 4px 14px rgba(3,70,80,0.35) !important}
+        .sa-btn-danger:hover:not(:disabled){background:rgba(220,53,69,0.14) !important}
+        .sa-btn-success:hover:not(:disabled){background:rgba(10,158,118,0.16) !important}
+        /* Cards hover */
+        .sa-card{transition:box-shadow 0.15s,transform 0.15s}
+        .sa-card:hover{box-shadow:0 6px 20px rgba(3,70,80,0.1) !important;transform:translateY(-2px)}
+        /* Table hover */
+        .sa-table tbody tr{transition:background 0.07s}
+        .sa-table tbody tr:hover>td{background:#f4f9fa !important}
+        /* Sidebar nav hover */
+        .sa-nav-btn{transition:background 0.12s,color 0.12s !important}
+        .sa-nav-btn:hover{background:rgba(255,255,255,0.09) !important;color:rgba(255,255,255,0.85) !important}
+        /* Modal */
+        .sa-modal-inner{animation:fadeUp 0.18s ease}
+        /* Mobile layout — hidden by default */
+        .sa-mob-header{display:none !important}
+        .sa-mob-nav{display:none !important}
+        /* Responsive breakpoints */
+        @media(max-width:767px){
+          .sa-sidebar{display:none !important}
+          .sa-mob-header{display:flex !important}
+          .sa-mob-nav{display:flex !important}
+          .sa-content{padding:14px 14px 80px !important}
+          .sa-g2{grid-template-columns:1fr !important}
+          .sa-dist-grid{grid-template-columns:1fr !important}
+          .sa-token-row{flex-direction:column !important;align-items:stretch !important}
+          .sa-token-row>*{width:100% !important}
+          .sa-toast{top:auto !important;bottom:74px !important;right:12px !important;left:12px !important;max-width:none !important;border-radius:12px !important}
+          .sa-modal-inner{padding:18px !important;max-height:95vh !important}
+          .sa-card:hover{transform:none !important;box-shadow:none !important}
+          /* iOS — prevent input zoom */
+          input,select,textarea{font-size:16px !important}
+          /* Tap target size */
+          .sa-btn{min-height:40px !important}
+        }
+        @media(max-width:479px){
+          .sa-content{padding:12px 12px 80px !important}
+          .sa-sync-grid{grid-template-columns:1fr 1fr !important}
+          .sa-table-wrap{border-radius:10px !important}
+        }
+        @media(max-width:359px){
+          .sa-sync-grid{grid-template-columns:1fr !important}
+        }
+        /* iOS safe area for bottom nav */
+        @supports(padding-bottom:env(safe-area-inset-bottom)){
+          .sa-mob-nav{padding-bottom:calc(6px + env(safe-area-inset-bottom)) !important}
+          .sa-content{padding-bottom:calc(80px + env(safe-area-inset-bottom)) !important}
+        }
       `}</style>
     </div>
   )
