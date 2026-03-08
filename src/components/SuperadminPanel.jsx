@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react'
-import { Building2, MapPin, Users, BarChart2, Settings, Plus, Pencil, Trash2, X, Search, LogOut, Eye, EyeOff, Check, AlertTriangle, ArrowLeft, Mail, RefreshCw, ChevronRight, Wifi, WifiOff, Loader2 } from 'lucide-react'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { Building2, MapPin, Users, BarChart2, Settings, Plus, Pencil, Trash2, X, Search, LogOut, Eye, EyeOff, Check, AlertTriangle, ArrowLeft, Mail, RefreshCw, ChevronRight, Wifi, WifiOff, Loader2, Upload } from 'lucide-react'
 import { saAPI } from '../auth.js'
 
 // ── Theme ─────────────────────────────────────────────────────────────────────
@@ -118,11 +118,73 @@ const tdSt = { padding: '11px 14px', fontSize: 13, color: T.text, borderBottom: 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  DISTRIBUIDORES MODULE
 // ═══════════════════════════════════════════════════════════════════════════════
+function LogoPicker({ value, name, onChange }) {
+  const inputRef = useRef()
+
+  const processFile = (file) => {
+    if (!file || !file.type.startsWith('image/')) return
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      const img = new Image()
+      img.onload = () => {
+        const MAX = 128
+        const scale = Math.min(MAX / img.width, MAX / img.height, 1)
+        const w = Math.round(img.width * scale)
+        const h = Math.round(img.height * scale)
+        const canvas = document.createElement('canvas')
+        canvas.width = w; canvas.height = h
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h)
+        onChange(canvas.toDataURL('image/jpeg', 0.82))
+      }
+      img.src = e.target.result
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const [drag, setDrag] = useState(false)
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+      <div
+        onClick={() => inputRef.current?.click()}
+        onDragOver={e => { e.preventDefault(); setDrag(true) }}
+        onDragLeave={() => setDrag(false)}
+        onDrop={e => { e.preventDefault(); setDrag(false); processFile(e.dataTransfer.files[0]) }}
+        style={{
+          width: 80, height: 80, borderRadius: 16, flexShrink: 0, cursor: 'pointer', overflow: 'hidden',
+          border: drag ? `2px dashed ${T.accent}` : value ? `2px solid ${T.border}` : `2px dashed ${T.border}`,
+          background: drag ? `${T.accent}10` : value ? '#fff' : T.bg,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative',
+          transition: 'border-color 0.15s, background 0.15s',
+        }}
+      >
+        {value
+          ? <img src={value} alt="logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          : <div style={{ textAlign: 'center', pointerEvents: 'none' }}>
+              <div style={{ fontSize: 26, fontWeight: 800, color: T.brand, lineHeight: 1 }}>{name?.[0]?.toUpperCase() || '?'}</div>
+              <Upload size={12} style={{ color: T.muted, marginTop: 4 }} />
+            </div>
+        }
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+        <Btn small variant="secondary" onClick={() => inputRef.current?.click()}><Upload size={12} /> Subir logo</Btn>
+        {value && <Btn small variant="danger" onClick={() => onChange('')}><Ic n="trash" s={12} /> Eliminar logo</Btn>}
+        <span style={{ fontSize: 11, color: T.muted, lineHeight: 1.4 }}>PNG, JPG o WebP.<br/>Se redimensionará a 128 px.</span>
+      </div>
+      <input ref={inputRef} type="file" accept="image/*" style={{ display: 'none' }}
+        onChange={e => { processFile(e.target.files[0]); e.target.value = '' }} />
+    </div>
+  )
+}
+
 function DistributorForm({ initial, onSave, onCancel, saving }) {
-  const [form, setForm] = useState({ name: '', contactEmail: '', contactPhone: '', notes: '', ...initial })
+  const [form, setForm] = useState({ name: '', contactEmail: '', contactPhone: '', notes: '', logo: '', ...initial })
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }))
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <Field label="Logo">
+        <LogoPicker value={form.logo} name={form.name} onChange={v => set('logo', v)} />
+      </Field>
       <Field label="Nombre *"><input style={S.inp} value={form.name} onChange={e => set('name', e.target.value)} placeholder="Nombre del distribuidor" /></Field>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
         <Field label="Email de contacto"><input style={S.inp} type="email" value={form.contactEmail} onChange={e => set('contactEmail', e.target.value)} placeholder="email@ejemplo.com" /></Field>
@@ -175,8 +237,8 @@ function DistributorDetail({ dist, onBack, toast }) {
         <Ic n="back" s={16} /> Volver a distribuidores
       </button>
       <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 24 }}>
-        <div style={{ width: 48, height: 48, borderRadius: 12, background: T.brand, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 20, fontWeight: 700, flexShrink: 0 }}>
-          {dist.name?.[0]?.toUpperCase() || 'D'}
+        <div style={{ width: 48, height: 48, borderRadius: 12, background: dist.logo ? '#fff' : T.brand, border: dist.logo ? `1px solid ${T.border}` : 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 20, fontWeight: 700, flexShrink: 0, overflow: 'hidden' }}>
+          {dist.logo ? <img src={dist.logo} alt={dist.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : (dist.name?.[0]?.toUpperCase() || 'D')}
         </div>
         <div>
           <h1 style={{ fontSize: 20, fontWeight: 700, color: T.brand, margin: '0 0 4px' }}>{dist.name}</h1>
@@ -305,8 +367,8 @@ function DistribuidoresModule({ toast }) {
           {items.map(d => (
             <div key={d.id} style={{ ...S.card, display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-                <div style={{ width: 40, height: 40, borderRadius: 10, background: d.status === 'suspended' ? '#fee2e2' : T.brand, display: 'flex', alignItems: 'center', justifyContent: 'center', color: d.status === 'suspended' ? T.red : '#fff', fontSize: 16, fontWeight: 700, flexShrink: 0 }}>
-                  {d.name?.[0]?.toUpperCase() || 'D'}
+                <div style={{ width: 40, height: 40, borderRadius: 10, background: d.logo ? '#fff' : (d.status === 'suspended' ? '#fee2e2' : T.brand), border: d.logo ? `1px solid ${T.border}` : 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', color: d.status === 'suspended' ? T.red : '#fff', fontSize: 16, fontWeight: 700, flexShrink: 0, overflow: 'hidden' }}>
+                  {d.logo ? <img src={d.logo} alt={d.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : (d.name?.[0]?.toUpperCase() || 'D')}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: 700, fontSize: 15, color: T.brand, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.name}</div>

@@ -53,6 +53,19 @@ const DEFAULT_USERS = [
   },
 ]
 
+// ── Defaults for config files ─────────────────────────────────────────────────
+const DEFAULT_EMAIL_CONFIG = {
+  recipients: '', senderName: 'StockIn Reports',
+  smtp: { host: 'smtp.gmail.com', port: 587, user: '', pass: '' },
+  sendDay: 1, enabled: false, lastSent: null, history: [],
+}
+
+const DEFAULT_GLOBAL_CONFIG = {
+  sessionTimeout: 480, syncInterval: 15,
+  whatsapp: { enabled: false, apikey: '', phone: '' },
+  email: { enabled: false, smtp: { host: '', port: 587, user: '', pass: '' }, senderName: 'StockIn', recipients: '' },
+}
+
 // En Vercel (readonly FS) los datos viven en memoria durante la ejecución
 let _memUsers        = null
 let _memLog          = []
@@ -78,10 +91,9 @@ const readJSON = (file) => {
   const dir  = getDataDir()
   const path = join(dir, file)
   if (!existsSync(path)) {
-    if (file === 'users.json') {
-      _memUsers = DEFAULT_USERS.map(u => ({ ...u }))
-      return _memUsers
-    }
+    if (file === 'users.json')        { _memUsers = DEFAULT_USERS.map(u => ({ ...u })); return _memUsers }
+    if (file === 'email-config.json')  return JSON.parse(JSON.stringify(DEFAULT_EMAIL_CONFIG))
+    if (file === 'global-config.json') return JSON.parse(JSON.stringify(DEFAULT_GLOBAL_CONFIG))
     return []
   }
   try {
@@ -108,6 +120,24 @@ const writeJSON = (file, data) => {
     if (file === 'activity-log.json') _memLog = data
   }
 }
+
+// ── Initialise data files on startup (create with defaults if missing) ────────
+const initDataFiles = () => {
+  const dir = getDataDir()
+  const write = (file, defaultData) => {
+    const p = join(dir, file)
+    if (!existsSync(p)) {
+      try { writeFileSync(p, JSON.stringify(defaultData, null, 2)) } catch {}
+    }
+  }
+  write('users.json',        DEFAULT_USERS.map(u => ({ ...u })))
+  write('distributors.json', [])
+  write('locations.json',    [])
+  write('activity-log.json', [])
+  write('email-config.json', JSON.parse(JSON.stringify(DEFAULT_EMAIL_CONFIG)))
+  write('global-config.json',JSON.parse(JSON.stringify(DEFAULT_GLOBAL_CONFIG)))
+}
+initDataFiles()
 
 // ── Activity log ──────────────────────────────────────────────────────────────
 const logActivity = (userId, username, action, ip, details = {}) => {
@@ -184,7 +214,7 @@ app.use(cors({
   },
   credentials: true,
 }))
-app.use(bodyParser.json())
+app.use(bodyParser.json({ limit: '2mb' }))
 
 // ── AUTH ──────────────────────────────────────────────────────────────────────
 app.post('/api/auth/login', async (req, res) => {
@@ -406,13 +436,14 @@ app.get('/api/sa/distributors/:id', authMiddleware, superadminOnly, (req, res) =
 })
 
 app.post('/api/sa/distributors', authMiddleware, superadminOnly, async (req, res) => {
-  const { name, contactEmail, contactPhone, notes } = req.body
+  const { name, contactEmail, contactPhone, notes, logo } = req.body
   if (!name) return res.status(400).json({ error: 'El nombre del distribuidor es obligatorio' })
   const dists = readJSON('distributors.json')
   const newDist = {
     id: `dist_${Date.now()}`, name,
     contactEmail: contactEmail||'', contactPhone: contactPhone||'',
     status: 'active', createdAt: new Date().toISOString(), notes: notes||'',
+    logo: logo||'',
   }
   dists.push(newDist)
   writeJSON('distributors.json', dists)
@@ -425,11 +456,12 @@ app.put('/api/sa/distributors/:id', authMiddleware, superadminOnly, async (req, 
   const dists = readJSON('distributors.json')
   const idx   = dists.findIndex(d => d.id === req.params.id)
   if (idx === -1) return res.status(404).json({ error: 'Distribuidor no encontrado' })
-  const { name, contactEmail, contactPhone, notes } = req.body
+  const { name, contactEmail, contactPhone, notes, logo } = req.body
   if (name         !== undefined) dists[idx].name         = name
   if (contactEmail !== undefined) dists[idx].contactEmail = contactEmail
   if (contactPhone !== undefined) dists[idx].contactPhone = contactPhone
   if (notes        !== undefined) dists[idx].notes        = notes
+  if (logo         !== undefined) dists[idx].logo         = logo
   writeJSON('distributors.json', dists)
   res.json({ ok: true })
 })
