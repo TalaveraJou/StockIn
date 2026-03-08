@@ -162,15 +162,22 @@ function StatusBadge({status}) {
   return <Badge color={c} label={l}/>
 }
 function Btn({onClick,disabled,children,variant="primary",small,full,style:sx={}}) {
-  const styles={primary:{background:T.accent,color:"#fff",border:"none"},brand:{background:T.brand,color:"#fff",border:"none"},secondary:{background:"#f0f4f5",color:T.text,border:`1px solid ${T.border}`},ghost:{background:"transparent",color:T.muted,border:`1px solid ${T.border}`},danger:{background:"rgba(220,53,69,0.08)",color:T.red,border:"1px solid rgba(220,53,69,0.2)"},success:{background:"rgba(10,158,118,0.1)",color:T.green,border:"1px solid rgba(10,158,118,0.25)"}}
-  return <button onClick={!disabled?onClick:undefined} disabled={disabled} style={{display:"inline-flex",alignItems:"center",justifyContent:"center",gap:6,padding:small?"6px 12px":"9px 18px",borderRadius:8,cursor:disabled?"not-allowed":"pointer",fontSize:small?12:13,fontWeight:600,fontFamily:"inherit",opacity:disabled?0.45:1,transition:"opacity 0.15s",width:full?"100%":"auto",...styles[variant],...sx}}>{children}</button>
+  const styles={
+    primary:{background:T.accent,color:"#fff",border:"none",boxShadow:"0 1px 4px rgba(5,146,167,0.25)"},
+    brand:{background:T.brand,color:"#fff",border:"none",boxShadow:"0 1px 4px rgba(3,70,80,0.25)"},
+    secondary:{background:"#f0f4f5",color:T.text,border:`1px solid ${T.border}`},
+    ghost:{background:"transparent",color:T.muted,border:`1px solid ${T.border}`},
+    danger:{background:"rgba(220,53,69,0.08)",color:T.red,border:"1px solid rgba(220,53,69,0.2)"},
+    success:{background:"rgba(10,158,118,0.1)",color:T.green,border:"1px solid rgba(10,158,118,0.25)"},
+  }
+  return <button onClick={!disabled?onClick:undefined} disabled={disabled} className={`app-btn app-btn-${variant}`} style={{display:"inline-flex",alignItems:"center",justifyContent:"center",gap:6,padding:small?"5px 11px":"9px 18px",borderRadius:8,cursor:disabled?"not-allowed":"pointer",fontSize:small?12:13,fontWeight:600,fontFamily:"inherit",opacity:disabled?0.45:1,transition:"filter 0.12s,box-shadow 0.12s,transform 0.1s",width:full?"100%":"auto",...styles[variant],...sx}}>{children}</button>
 }
 function Modal({title,onClose,children,maxW=600}) {
-  return <div style={{position:"fixed",inset:0,zIndex:300,background:"rgba(3,70,80,0.4)",backdropFilter:"blur(3px)",display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
-    <div style={{background:"#fff",borderRadius:14,border:`1px solid ${T.border}`,width:"100%",maxWidth:maxW,maxHeight:"92vh",overflow:"auto",padding:24,animation:"fadeUp 0.18s ease",boxShadow:"0 20px 60px rgba(3,70,80,0.18)"}}>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18}}>
+  return <div style={{position:"fixed",inset:0,zIndex:300,background:"rgba(3,70,80,0.45)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+    <div className="modal-inner" style={{background:"#fff",borderRadius:16,border:`1px solid ${T.border}`,width:"100%",maxWidth:maxW,maxHeight:"92vh",overflow:"auto",padding:24,animation:"fadeUp 0.18s ease",boxShadow:"0 24px 64px rgba(3,70,80,0.22)"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18,paddingBottom:14,borderBottom:`1px solid ${T.border}`}}>
         <h2 style={{fontSize:16,fontWeight:700,color:T.brand,margin:0}}>{title}</h2>
-        <button onClick={onClose} style={{background:"none",border:"none",color:T.muted,cursor:"pointer",padding:4,borderRadius:6,display:"flex"}}><Ic n="close" s={17}/></button>
+        <button onClick={onClose} style={{background:T.bg,border:`1px solid ${T.border}`,color:T.muted,cursor:"pointer",padding:"5px 7px",borderRadius:8,display:"flex",transition:"background 0.1s"}}><Ic n="close" s={15}/></button>
       </div>
       {children}
     </div>
@@ -616,7 +623,7 @@ function Dashboard({stockRows,alertas,albaranes,traspasos,conn,onNav,role}) {
         </div>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:14,marginBottom:24}}>
           {kpis.map(k=>(
-            <div key={k.label} onClick={k.link?()=>onNav(k.link):undefined} style={{...S.card,cursor:k.link?"pointer":"default",display:"flex",alignItems:"center",gap:14,padding:18,transition:"box-shadow 0.15s"}} onMouseEnter={e=>{if(k.link)e.currentTarget.style.boxShadow="0 4px 16px rgba(3,70,80,0.12)"}} onMouseLeave={e=>e.currentTarget.style.boxShadow="0 1px 3px rgba(3,70,80,0.07)"}>
+            <div key={k.label} onClick={k.link?()=>onNav(k.link):undefined} className={k.link?"app-card":""} style={{...S.card,cursor:k.link?"pointer":"default",display:"flex",alignItems:"center",gap:14,padding:18}}>
               <div style={{width:44,height:44,borderRadius:12,background:`${k.color}18`,display:"flex",alignItems:"center",justifyContent:"center",color:k.color,flexShrink:0}}><Ic n={k.icon} s={22}/></div>
               <div><div style={{fontSize:22,fontWeight:800,color:k.color,lineHeight:1}}>{k.val}</div><div style={{fontSize:12,color:T.muted,marginTop:3}}>{k.label}</div></div>
             </div>
@@ -688,7 +695,7 @@ function Dashboard({stockRows,alertas,albaranes,traspasos,conn,onNav,role}) {
       {/* KPI cards */}
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(175px,1fr))",gap:12,marginBottom:20}}>
         {kpis.map(k=>(
-          <div key={k.label} onClick={k.link?()=>onNav(k.link):undefined} style={{...S.card,cursor:k.link?"pointer":"default",display:"flex",alignItems:"center",gap:12,padding:16,transition:"box-shadow 0.15s"}} onMouseEnter={e=>{if(k.link)e.currentTarget.style.boxShadow="0 4px 16px rgba(3,70,80,0.12)"}} onMouseLeave={e=>e.currentTarget.style.boxShadow="0 1px 3px rgba(3,70,80,0.07)"}>
+          <div key={k.label} onClick={k.link?()=>onNav(k.link):undefined} className={k.link?"app-card":""} style={{...S.card,cursor:k.link?"pointer":"default",display:"flex",alignItems:"center",gap:12,padding:16}}>
             <div style={{width:40,height:40,borderRadius:11,background:`${k.color}18`,display:"flex",alignItems:"center",justifyContent:"center",color:k.color,flexShrink:0}}><Ic n={k.icon} s={20}/></div>
             <div><div style={{fontSize:20,fontWeight:800,color:k.color,lineHeight:1}}>{k.val}</div><div style={{fontSize:11,color:T.muted,marginTop:3}}>{k.label}</div></div>
           </div>
@@ -769,7 +776,7 @@ function AlertasView({stockRows,alertas,warehouses,onIrInventario,role}) {
       </div>
       <div style={S.card}>
         {current.length===0?<Empty msg="Sin alertas en esta categoría" icon="check"/>:
-        <table style={{width:"100%",borderCollapse:"collapse"}}>
+        <table className="app-table" style={{width:"100%",borderCollapse:"collapse"}}>
           <thead><tr>
             {["Producto","Familia","Almacén","Stock actual","Mín","Máx","Diferencia"].map(h=><th key={h} style={thSt}>{h}</th>)}
           </tr></thead>
@@ -874,7 +881,7 @@ function StockView({stockRows,warehouses,role,albaranes}) {
         </select>
       </div>
       <div style={{...S.card,padding:0,overflow:"auto"}}>
-        <table style={{width:"100%",borderCollapse:"collapse",minWidth:700}}>
+        <table className="app-table" style={{width:"100%",borderCollapse:"collapse",minWidth:700}}>
           <thead><tr>
             <Th col="prod">Producto</Th>
             <th style={thSt}>Ref</th>
@@ -1069,7 +1076,7 @@ function RegularizacionView({stockRows,products,warehouses,conn,onGuardar,toast,
         </div>
         {selected.length>0&&<div style={{marginBottom:10,fontSize:12,color:T.accent,fontWeight:600}}>{selected.length} producto{selected.length>1?"s":""} seleccionado{selected.length>1?"s":""}</div>}
         <div style={{maxHeight:420,overflowY:"auto"}}>
-          <table style={{width:"100%",borderCollapse:"collapse"}}>
+          <table className="app-table" style={{width:"100%",borderCollapse:"collapse"}}>
             <thead><tr>
               <th style={thSt}><input type="checkbox" onChange={e=>{if(e.target.checked)setSelected(filteredRows.map(r=>({ProductId:r.ProductId,productName:r.prod?.Name||String(r.ProductId),currentQty:r.Quantity,cantidad:"0",costPrice:String(r.costPrice??0),loc:r.loc||""})));else setSelected([])}} checked={filteredRows.length>0&&filteredRows.every(r=>isSelected(r.ProductId))} style={{accentColor:T.accent}}/></th>
               <th style={thSt}>Producto</th>
@@ -1107,7 +1114,7 @@ function RegularizacionView({stockRows,products,warehouses,conn,onGuardar,toast,
             </div>
           </div>
         </div>
-        <table style={{width:"100%",borderCollapse:"collapse",marginBottom:16}}>
+        <table className="app-table" style={{width:"100%",borderCollapse:"collapse",marginBottom:16}}>
           <thead><tr>
             <th style={thSt}>Producto</th>
             <th style={thSt}>Stock actual</th>
@@ -1148,7 +1155,7 @@ function RegularizacionView({stockRows,products,warehouses,conn,onGuardar,toast,
           <div style={{fontSize:12,color:T.muted}}>Tipo: <strong style={{color:T.text}}>{tipo==="entrada"?"Entrada":"Salida"}</strong></div>
           {motivo&&<div style={{fontSize:12,color:T.muted,marginTop:4}}>Motivo: <strong style={{color:T.text}}>{motivo}</strong></div>}
         </div>
-        <table style={{width:"100%",borderCollapse:"collapse",marginBottom:16}}>
+        <table className="app-table" style={{width:"100%",borderCollapse:"collapse",marginBottom:16}}>
           <thead><tr>
             <th style={thSt}>Producto</th>
             <th style={thSt}>Antes</th>
@@ -1274,7 +1281,7 @@ function PedidosReposicionView({stockRows,products,warehouses,suppliers,conn,onC
 
         {lines.length===0
           ?<Empty msg="Añade productos o pulsa «Añadir todos bajo mínimo»" icon="cart"/>
-          :<table style={{width:"100%",borderCollapse:"collapse"}}>
+          :<table className="app-table" style={{width:"100%",borderCollapse:"collapse"}}>
             <thead><tr>
               <th style={thSt}>Producto</th>
               <th style={thSt}>Cantidad</th>
@@ -1335,7 +1342,7 @@ function HistoricoView({albaranes,traspasos,warehouses}) {
 
       {tab==="albaranes"&&<div style={{...S.card,padding:0,overflow:"auto"}}>
         {filtAlb.length===0?<Empty msg="Sin albaranes" icon="albaran"/>:
-        <table style={{width:"100%",borderCollapse:"collapse",minWidth:600}}>
+        <table className="app-table" style={{width:"100%",borderCollapse:"collapse",minWidth:600}}>
           <thead><tr>
             {["Fecha","Proveedor","Almacén","Líneas","Total","Estado"].map(h=><th key={h} style={thSt}>{h}</th>)}
           </tr></thead>
@@ -1357,7 +1364,7 @@ function HistoricoView({albaranes,traspasos,warehouses}) {
 
       {tab==="traspasos"&&<div style={{...S.card,padding:0,overflow:"auto"}}>
         {filtTr.length===0?<Empty msg="Sin traspasos" icon="transfer"/>:
-        <table style={{width:"100%",borderCollapse:"collapse",minWidth:500}}>
+        <table className="app-table" style={{width:"100%",borderCollapse:"collapse",minWidth:500}}>
           <thead><tr>
             {["Fecha","Origen","Destino","Líneas","Estado"].map(h=><th key={h} style={thSt}>{h}</th>)}
           </tr></thead>
@@ -1477,7 +1484,7 @@ function AlbaranForm({products,suppliers,warehouses,onSave,onCancel,toast,suppli
           </div>
           <Btn small variant="secondary" onClick={()=>setShowScanner(true)}><Ic n="camera" s={13}/>Escanear</Btn>
         </div>
-        {lines.length>0&&<table style={{width:"100%",borderCollapse:"collapse"}}>
+        {lines.length>0&&<table className="app-table" style={{width:"100%",borderCollapse:"collapse"}}>
           <thead><tr>
             <th style={thSt}>Producto</th>
             <th style={thSt}>Cantidad</th>
@@ -1542,7 +1549,7 @@ function AlbaranesView({albaranes,products,suppliers,warehouses,conn,onImportar,
       </div>
       <div style={{...S.card,padding:0,overflow:"auto"}}>
         {filtered.length===0?<Empty msg="Sin albaranes" icon="albaran"/>:
-        <table style={{width:"100%",borderCollapse:"collapse",minWidth:580}}>
+        <table className="app-table" style={{width:"100%",borderCollapse:"collapse",minWidth:580}}>
           <thead><tr>
             {["Fecha","Proveedor","Almacén","Líneas","Estado"].map(h=><th key={h} style={thSt}>{h}</th>)}
           </tr></thead>
@@ -1640,7 +1647,7 @@ function TraspasosView({traspasos,products,warehouses,conn,onImportar,toast,stoc
         </div>
         {lines.length===0
           ?<Empty msg="Busca y añade los productos a traspasar" icon="transfer"/>
-          :<table style={{width:"100%",borderCollapse:"collapse"}}>
+          :<table className="app-table" style={{width:"100%",borderCollapse:"collapse"}}>
             <thead><tr>
               <th style={thSt}>Producto</th>
               <th style={thSt}>Disponible en origen</th>
@@ -1791,7 +1798,7 @@ function ProductosView({products,warehouses,suppliers,conn,onSave,toast,role,sup
       </div>
       <div style={{...S.card,padding:0,overflow:"auto"}}>
         {filtered.length===0?<Empty msg="Sin productos" icon="box"/>:
-        <table style={{width:"100%",borderCollapse:"collapse",minWidth:520}}>
+        <table className="app-table" style={{width:"100%",borderCollapse:"collapse",minWidth:520}}>
           <thead><tr>
             <th style={thSt}>Producto</th>
             <th style={thSt}>Ref</th>
@@ -2427,14 +2434,14 @@ export default function App() {
 
   const SidebarContent=()=>(
     <>
-      <div style={{padding:"16px 14px 12px",borderBottom:"1px solid rgba(255,255,255,0.1)"}}>
-        <div style={{display:"flex",alignItems:"center",gap:9}}>
-          <div style={{width:34,height:34,borderRadius:9,background:T.accent,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+      <div style={{padding:"18px 16px 14px",borderBottom:"1px solid rgba(255,255,255,0.1)"}}>
+        <div style={{display:"flex",alignItems:"center",gap:10}}>
+          <div style={{width:36,height:36,borderRadius:10,background:T.accent,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,boxShadow:"0 2px 8px rgba(5,146,167,0.4)"}}>
             <Ic n="warehouse" s={17}/>
           </div>
           <div className="sidebar-logo-text">
-            <div style={{fontSize:14,fontWeight:700,color:"#fff",letterSpacing:"-0.2px"}}><span style={{color:T.accent}}>rekor</span><span style={{color:"rgba(255,255,255,0.45)"}}>.es</span></div>
-            <div style={{fontSize:10,color:"rgba(255,255,255,0.4)",letterSpacing:"0.1em",textTransform:"uppercase"}}>StockIn</div>
+            <div style={{fontSize:15,fontWeight:800,color:"#fff",letterSpacing:"-0.3px"}}><span style={{color:"#5dd8e8"}}>rekor</span><span style={{color:"rgba(255,255,255,0.35)"}}>.es</span></div>
+            <div style={{fontSize:9.5,color:"rgba(255,255,255,0.38)",letterSpacing:"0.12em",textTransform:"uppercase",marginTop:1}}>StockIn</div>
           </div>
         </div>
         {PERMS.canManageConns(role)&&<div style={{marginTop:10}}>
@@ -2444,21 +2451,22 @@ export default function App() {
       {activeConn?.mode==="acms"&&activeConn.workplaces?.length>0&&<WorkplaceSelector workplaces={activeConn.workplaces} activeId={activeConn.activeWorkplace} onChange={switchWorkplace}/>}
       <nav style={{flex:1,padding:"10px 8px",overflowY:"auto"}}>
         {NAV_ITEMS.map(item=>(
-          <button key={item.id} onClick={()=>navigate(item.id)} style={{width:"100%",display:"flex",alignItems:"center",gap:8,padding:"9px 10px",borderRadius:8,border:"none",cursor:"pointer",marginBottom:1,fontFamily:"inherit",background:view===item.id?"rgba(255,255,255,0.12)":"transparent",color:view===item.id?"#fff":"rgba(255,255,255,0.55)",fontSize:13,fontWeight:view===item.id?600:400,textAlign:"left"}}>
+          <button key={item.id} onClick={()=>navigate(item.id)} className="app-nav-btn" style={{width:"100%",display:"flex",alignItems:"center",gap:9,padding:"9px 12px",borderRadius:9,border:"none",cursor:"pointer",marginBottom:2,fontFamily:"inherit",background:view===item.id?"rgba(255,255,255,0.13)":"transparent",color:view===item.id?"#fff":"rgba(255,255,255,0.52)",fontSize:13,fontWeight:view===item.id?600:400,textAlign:"left",transition:"background 0.12s,color 0.12s",boxShadow:view===item.id?"inset 2px 0 0 #5dd8e8":"none"}}>
             <Ic n={item.icon} s={15}/>
             <span className="sidebar-label" style={{flex:1}}>{item.label}</span>
             {item.badge&&<span className="sidebar-label" style={{background:item.bc,color:item.bc===T.yellow?"#000":"#fff",borderRadius:20,padding:"1px 7px",fontSize:10,fontWeight:700}}>{item.badge}</span>}
+            {view===item.id&&!item.badge&&<div className="sidebar-label" style={{width:5,height:5,borderRadius:"50%",background:T.accent,flexShrink:0}}/>}
           </button>
         ))}
       </nav>
-      <div style={{padding:"10px 10px 4px",borderTop:"1px solid rgba(255,255,255,0.1)"}}>
-        <div style={{display:"flex",alignItems:"center",gap:8,padding:"8px 6px",borderRadius:8,background:"rgba(255,255,255,0.07)",marginBottom:6,cursor:"pointer"}} onClick={()=>setModal("account")} title="Configuración de cuenta">
-          <div style={{width:32,height:32,borderRadius:8,background:ROLE_BADGE_COLOR[role]||T.muted,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:13,fontWeight:700,color:"#fff"}}>{user.fullName?.[0]?.toUpperCase()||"?"}</div>
+      <div style={{padding:"10px 10px 6px",borderTop:"1px solid rgba(255,255,255,0.1)"}}>
+        <div style={{display:"flex",alignItems:"center",gap:8,padding:"9px 8px",borderRadius:10,background:"rgba(255,255,255,0.07)",marginBottom:6,cursor:"pointer",transition:"background 0.12s"}} onClick={()=>setModal("account")} title="Configuración de cuenta">
+          <div style={{width:32,height:32,borderRadius:8,background:ROLE_BADGE_COLOR[role]||T.muted,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:13,fontWeight:700,color:"#fff",boxShadow:`0 2px 6px ${ROLE_BADGE_COLOR[role]||T.muted}50`}}>{user.fullName?.[0]?.toUpperCase()||"?"}</div>
           <div className="sidebar-label" style={{flex:1,minWidth:0}}>
             <div style={{fontSize:12,fontWeight:600,color:"#fff",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{user.fullName}</div>
-            <div style={{fontSize:10,color:"rgba(255,255,255,0.5)"}}>{ROLE_BADGE_LABEL[role]||role}</div>
+            <div style={{fontSize:10,color:"rgba(255,255,255,0.45)"}}>{ROLE_BADGE_LABEL[role]||role}</div>
           </div>
-          <button onClick={e=>{e.stopPropagation();handleLogout()}} title="Cerrar sesión" style={{background:"rgba(255,255,255,0.1)",border:"none",borderRadius:6,color:"rgba(255,255,255,0.6)",cursor:"pointer",padding:"5px",display:"flex"}}>
+          <button onClick={e=>{e.stopPropagation();handleLogout()}} title="Cerrar sesión" style={{background:"rgba(255,255,255,0.1)",border:"none",borderRadius:7,color:"rgba(255,255,255,0.65)",cursor:"pointer",padding:"6px 7px",display:"flex",transition:"background 0.12s"}}>
             <Ic n="logout" s={14}/>
           </button>
         </div>
@@ -2486,9 +2494,9 @@ export default function App() {
         </div>
       )}
       <main style={{flex:1,overflow:"auto",minWidth:0}}>
-        <div className="topbar-mobile" style={{display:"none",alignItems:"center",gap:10,padding:"12px 16px",background:T.brand,position:"sticky",top:0,zIndex:100,borderBottom:"1px solid rgba(255,255,255,0.1)"}}>
-          <button onClick={()=>setSideOpen(true)} style={{background:"rgba(255,255,255,0.1)",border:"none",borderRadius:8,color:"#fff",cursor:"pointer",padding:"7px",display:"flex"}}><Ic n="menu" s={18}/></button>
-          <div style={{flex:1,fontSize:14,fontWeight:700,color:"#fff"}}><span style={{color:T.accent}}>rekor</span>.es StockIn</div>
+        <div className="topbar-mobile" style={{display:"none",alignItems:"center",gap:10,padding:"0 16px",height:52,background:T.brand,position:"sticky",top:0,zIndex:100,borderBottom:"1px solid rgba(255,255,255,0.1)",boxShadow:"0 2px 8px rgba(3,70,80,0.25)"}}>
+          <button onClick={()=>setSideOpen(true)} style={{background:"rgba(255,255,255,0.12)",border:"none",borderRadius:8,color:"#fff",cursor:"pointer",padding:"7px",display:"flex"}}><Ic n="menu" s={18}/></button>
+          <div style={{flex:1,fontSize:14,fontWeight:800,color:"#fff"}}><span style={{color:"#5dd8e8"}}>rekor</span><span style={{color:"rgba(255,255,255,0.35)"}}>.es</span><span style={{fontWeight:600,fontSize:13,color:"rgba(255,255,255,0.8)",marginLeft:6}}>StockIn</span></div>
           <div style={{display:"flex",alignItems:"center",gap:5,fontSize:11,fontWeight:600,color:online?T.green:T.orange}}>
             <div style={{width:6,height:6,borderRadius:"50%",background:online?T.green:T.orange,animation:!online?"pulse 1.5s infinite":"none"}}/>
             {!online&&"Offline"}
@@ -2543,15 +2551,31 @@ export default function App() {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap');
         *{box-sizing:border-box;margin:0;padding:0}
-        ::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-track{background:#f0f5f6}::-webkit-scrollbar-thumb{background:#c5d8db;border-radius:3px}
+        ::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-track{background:#f0f5f6}::-webkit-scrollbar-thumb{background:#c5d8db;border-radius:3px}::-webkit-scrollbar-thumb:hover{background:#0592A7}
         button:focus-visible{outline:2px solid #0592A7;outline-offset:2px}
-        input:focus,select:focus{border-color:#0592A7 !important;box-shadow:0 0 0 3px rgba(5,146,167,0.12) !important;outline:none}
+        input:focus,select:focus,textarea:focus{border-color:#0592A7 !important;box-shadow:0 0 0 3px rgba(5,146,167,0.13) !important;outline:none}
         @keyframes spin{to{transform:rotate(360deg)}}
-        @keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+        @keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
         @keyframes slideIn{from{opacity:0;transform:translateX(14px)}to{opacity:1;transform:none}}
         @keyframes slideRight{from{transform:translateX(-100%)}to{transform:none}}
         @keyframes slideDown{from{opacity:0;transform:translateY(-100%)}to{opacity:1;transform:none}}
         @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+        /* ── Buttons ── */
+        .app-btn{transition:filter 0.12s,box-shadow 0.12s,transform 0.1s !important}
+        .app-btn:hover:not(:disabled){filter:brightness(0.92)}
+        .app-btn:active:not(:disabled){transform:scale(0.97) !important}
+        .app-btn-primary:hover:not(:disabled){box-shadow:0 4px 14px rgba(5,146,167,0.38) !important}
+        .app-btn-brand:hover:not(:disabled){box-shadow:0 4px 14px rgba(3,70,80,0.35) !important}
+        .app-btn-danger:hover:not(:disabled){background:rgba(220,53,69,0.14) !important}
+        .app-btn-success:hover:not(:disabled){background:rgba(10,158,118,0.16) !important}
+        /* ── Cards ── */
+        .app-card{transition:box-shadow 0.15s,transform 0.15s}
+        .app-card:hover{box-shadow:0 6px 20px rgba(3,70,80,0.1) !important;transform:translateY(-2px)}
+        /* ── Tables ── */
+        .app-table tbody tr{transition:background 0.07s}
+        .app-table tbody tr:hover>td{background:#f4f9fa !important}
+        /* ── Sidebar nav ── */
+        .app-nav-btn:hover{background:rgba(255,255,255,0.09) !important;color:rgba(255,255,255,0.85) !important}
         @media(max-width:768px){
           .sidebar-desktop{display:none !important}
           .topbar-mobile{display:flex !important}

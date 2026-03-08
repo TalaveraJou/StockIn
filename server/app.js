@@ -8,7 +8,7 @@ import cors from 'cors'
 import bodyParser from 'body-parser'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs'
+import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync, chmodSync } from 'fs'
 import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
 
@@ -73,7 +73,14 @@ let _memDistributors = null
 let _memLocations    = null
 
 const isWritable = (dir) => {
-  try { mkdirSync(dir, { recursive: true }); return true } catch { return false }
+  try {
+    mkdirSync(dir, { recursive: true })
+    // Actually test write access — mkdirSync on an existing dir never throws
+    const probe = join(dir, '.write-probe')
+    writeFileSync(probe, '')
+    unlinkSync(probe)
+    return true
+  } catch { return false }
 }
 
 const getDataDir = () => {
@@ -124,10 +131,14 @@ const writeJSON = (file, data) => {
 // ── Initialise data files on startup (create with defaults if missing) ────────
 const initDataFiles = () => {
   const dir = getDataDir()
+  // Ensure directory and all data files are writable by any process user
+  try { chmodSync(dir, 0o777) } catch {}
+  const DATA_FILES = ['users.json','distributors.json','locations.json','activity-log.json','email-config.json','global-config.json']
+  DATA_FILES.forEach(f => { const p = join(dir, f); if (existsSync(p)) try { chmodSync(p, 0o666) } catch {} })
   const write = (file, defaultData) => {
     const p = join(dir, file)
     if (!existsSync(p)) {
-      try { writeFileSync(p, JSON.stringify(defaultData, null, 2)) } catch {}
+      try { writeFileSync(p, JSON.stringify(defaultData, null, 2)); try { chmodSync(p, 0o666) } catch {} } catch {}
     }
   }
   write('users.json',        DEFAULT_USERS.map(u => ({ ...u })))
