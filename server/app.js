@@ -78,7 +78,10 @@ const readJSON = (file) => {
   const dir  = getDataDir()
   const path = join(dir, file)
   if (!existsSync(path)) {
-    if (file === 'users.json') return DEFAULT_USERS.map(u => ({ ...u }))
+    if (file === 'users.json') {
+      _memUsers = DEFAULT_USERS.map(u => ({ ...u }))
+      return _memUsers
+    }
     return []
   }
   try { return JSON.parse(readFileSync(path, 'utf8')) } catch { return [] }
@@ -649,22 +652,12 @@ app.get('/api/sa/reports/metrics', authMiddleware, superadminOnly, (req, res) =>
   const locs  = readJSON('locations.json')
   const users = readJSON('users.json')
   res.json({
-    distributors: {
-      total:     dists.length,
-      active:    dists.filter(d => d.status === 'active').length,
-      suspended: dists.filter(d => d.status === 'suspended').length,
-    },
-    locations: {
-      total:   locs.length,
-      active:  locs.filter(l => l.status !== 'blocked').length,
-      blocked: locs.filter(l => l.status === 'blocked').length,
-      syncing: locs.filter(l => l.connectionStatus === 'active').length,
-      failing: locs.filter(l => l.connectionStatus === 'failing').length,
-    },
-    users: {
-      total:  users.length,
-      active: users.filter(u => u.active).length,
-    },
+    distributors:           dists.length,
+    suspendedDistributors:  dists.filter(d => d.status === 'suspended').length,
+    locations:              locs.length,
+    blockedLocations:       locs.filter(l => l.status === 'blocked').length,
+    users:                  users.length,
+    activeSessions:         0,
   })
 })
 

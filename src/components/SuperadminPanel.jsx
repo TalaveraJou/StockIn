@@ -878,11 +878,11 @@ function InformesModule({ toast }) {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [mRes, eRes] = await Promise.all([saAPI.getMetrics(), saAPI.getEvents()])
+      const mRes = await saAPI.getMetrics()
       setMetrics(mRes)
-      setEvents(Array.isArray(eRes) ? eRes : [])
-    } catch (e) { toast(e.message, 'err') }
+    } catch (e) { toast('Error al cargar métricas: ' + e.message, 'err') }
     setLoading(false)
+    saAPI.getEvents().then(r => { if (Array.isArray(r)) setEvents(r) }).catch(() => {})
   }, [])
 
   useEffect(() => { load() }, [load])
