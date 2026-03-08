@@ -413,33 +413,71 @@ function DistribuidoresModule({ toast }) {
 // ═══════════════════════════════════════════════════════════════════════════════
 //  LOCALES MODULE
 // ═══════════════════════════════════════════════════════════════════════════════
+const SYNC_LABELS = [
+  { key: 'employees',  label: 'Empleados',       icon: '👤' },
+  { key: 'warehouses', label: 'Almacenes',        icon: '🏭' },
+  { key: 'products',   label: 'Productos',        icon: '📦' },
+  { key: 'suppliers',  label: 'Proveedores',      icon: '🚚' },
+  { key: 'stocks',     label: 'Líneas de stock',  icon: '📊' },
+  { key: 'workplaces', label: 'Puestos de venta', icon: '🖥️' },
+]
+
+function SyncSummaryPanel({ summary, status, msg, onRetry, canRetry }) {
+  if (!status) return null
+  const isLoading = status === 'loading'
+  const isOk      = status === 'ok'
+  const accent    = isOk ? T.green : isLoading ? T.accent : T.red
+
+  return (
+    <div style={{ borderRadius: 10, border: `1px solid ${accent}30`, background: isOk ? `${T.green}08` : isLoading ? `${T.accent}08` : `${T.red}08`, padding: 14, marginTop: 4 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: isOk && summary ? 12 : 0 }}>
+        {isLoading
+          ? <Loader2 size={15} style={{ color: T.accent, animation: 'spin 1s linear infinite', flexShrink: 0 }} />
+          : isOk ? <Wifi size={15} style={{ color: T.green, flexShrink: 0 }} />
+                 : <WifiOff size={15} style={{ color: T.red, flexShrink: 0 }} />}
+        <span style={{ fontSize: 13, fontWeight: 600, color: accent }}>
+          {isLoading ? 'Probando sincronización con Ágora…' : isOk ? 'Sincronización correcta' : msg || 'Error de conexión'}
+        </span>
+        {!isOk && !isLoading && canRetry && (
+          <button onClick={onRetry} style={{ marginLeft: 'auto', background: 'none', border: `1px solid ${T.red}40`, borderRadius: 6, padding: '3px 10px', fontSize: 11, color: T.red, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
+            <RefreshCw size={11}/> Reintentar
+          </button>
+        )}
+      </div>
+      {isOk && summary && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+          {SYNC_LABELS.filter(s => summary[s.key] !== undefined).map(({ key, label, icon }) => (
+            <div key={key} style={{ background: '#fff', borderRadius: 8, padding: '8px 10px', border: `1px solid ${T.border}`, textAlign: 'center' }}>
+              <div style={{ fontSize: 11, color: T.muted, marginBottom: 2 }}>{icon} {label}</div>
+              <div style={{ fontSize: 20, fontWeight: 700, color: T.brand }}>{summary[key]}</div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function LocationForm({ initial, distributors, onSave, onCancel, saving }) {
   const [form, setForm] = useState({ name: '', city: '', distributorId: '', notes: '', agoraUrl: '', apiToken: '', ...initial })
   const [showToken,   setShowToken]   = useState(false)
-  const [connStatus,  setConnStatus]  = useState(null) // null | 'loading' | 'ok' | 'error'
-  const [connMsg,     setConnMsg]     = useState('')
-  const set = (k, v) => { setForm(p => ({ ...p, [k]: v })); if (k === 'agoraUrl' || k === 'apiToken') { setConnStatus(null); setConnMsg('') } }
-
-  const testConn = async () => {
-    if (!form.agoraUrl || !form.apiToken) return
-    setConnStatus('loading'); setConnMsg('')
-    try {
-      const r = await saAPI.testAgoraConnection({ agoraUrl: form.agoraUrl, apiToken: form.apiToken })
-      if (r.ok) { setConnStatus('ok'); setConnMsg(`Conexión OK — ${r.employeesCount} empleado${r.employeesCount !== 1 ? 's' : ''} encontrados`) }
-      else       { setConnStatus('error'); setConnMsg(r.error || 'Error desconocido') }
-    } catch (e) { setConnStatus('error'); setConnMsg(e.message || 'Error de conexión') }
+  const [syncStatus,  setSyncStatus]  = useState(null)   // null | 'loading' | 'ok' | 'error'
+  const [syncMsg,     setSyncMsg]     = useState('')
+  const [syncSummary, setSyncSummary] = useState(null)
+  const set = (k, v) => {
+    setForm(p => ({ ...p, [k]: v }))
+    if (k === 'agoraUrl' || k === 'apiToken') { setSyncStatus(null); setSyncMsg(''); setSyncSummary(null) }
   }
 
-  const connBanner = connStatus && (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 8, fontSize: 12, fontWeight: 500,
-      background: connStatus === 'ok' ? `${T.green}12` : connStatus === 'error' ? `${T.red}12` : `${T.muted}12`,
-      color: connStatus === 'ok' ? T.green : connStatus === 'error' ? T.red : T.muted,
-      border: `1px solid ${connStatus === 'ok' ? T.green : connStatus === 'error' ? T.red : T.muted}30`,
-    }}>
-      {connStatus === 'loading' ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : connStatus === 'ok' ? <Wifi size={13}/> : <WifiOff size={13}/>}
-      {connStatus === 'loading' ? 'Verificando conexión con Ágora…' : connMsg}
-    </div>
-  )
+  const runSync = async () => {
+    if (!form.agoraUrl || !form.apiToken) return
+    setSyncStatus('loading'); setSyncMsg(''); setSyncSummary(null)
+    try {
+      const r = await saAPI.testAgoraConnection({ agoraUrl: form.agoraUrl, apiToken: form.apiToken })
+      if (r.ok) { setSyncStatus('ok'); setSyncSummary(r.summary) }
+      else       { setSyncStatus('error'); setSyncMsg(r.error || 'Error desconocido') }
+    } catch (e) { setSyncStatus('error'); setSyncMsg(e.message || 'Error de conexión') }
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -453,8 +491,12 @@ function LocationForm({ initial, distributors, onSave, onCancel, saving }) {
           </select>
         </Field>
       </div>
+
+      {/* ── Ágora connection ─────────────────────────────────────────── */}
       <div style={{ borderTop: `1px solid ${T.border}`, paddingTop: 14 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: T.brand, marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Conexión Ágora TPV</div>
+        <div style={{ fontSize: 12, fontWeight: 700, color: T.brand, marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+          Conexión Ágora TPV
+        </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <Field label="URL del servidor Ágora" hint="Ej: http://192.168.1.10:8984">
             <input style={S.inp} value={form.agoraUrl} onChange={e => set('agoraUrl', e.target.value)} placeholder="http://192.168.1.10:8984" />
@@ -467,15 +509,26 @@ function LocationForm({ initial, distributors, onSave, onCancel, saving }) {
                   {showToken ? <EyeOff size={16}/> : <Eye size={16}/>}
                 </button>
               </div>
-              <Btn variant="secondary" onClick={testConn} disabled={!form.agoraUrl || !form.apiToken || connStatus === 'loading'} style={{ whiteSpace: 'nowrap', flexShrink: 0 }}>
-                {connStatus === 'loading' ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }}/> : <Wifi size={13}/>}
-                Verificar
+              <Btn
+                variant={syncStatus === 'ok' ? 'success' : 'secondary'}
+                onClick={runSync}
+                disabled={!form.agoraUrl || !form.apiToken || syncStatus === 'loading'}
+                style={{ whiteSpace: 'nowrap', flexShrink: 0 }}
+              >
+                {syncStatus === 'loading'
+                  ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} />
+                  : <RefreshCw size={13} />}
+                Probar sincronización
               </Btn>
             </div>
           </Field>
-          {connBanner}
+          <SyncSummaryPanel
+            status={syncStatus} summary={syncSummary} msg={syncMsg}
+            onRetry={runSync} canRetry={!!(form.agoraUrl && form.apiToken)}
+          />
         </div>
       </div>
+
       <Field label="Notas"><textarea style={{ ...S.inp, minHeight: 60, resize: 'vertical' }} value={form.notes} onChange={e => set('notes', e.target.value)} placeholder="Notas internas…" /></Field>
       <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 4 }}>
         <Btn variant="secondary" onClick={onCancel}>Cancelar</Btn>
@@ -485,6 +538,12 @@ function LocationForm({ initial, distributors, onSave, onCancel, saving }) {
       </div>
     </div>
   )
+}
+
+const fmtDate = (iso) => {
+  if (!iso) return null
+  const d = new Date(iso)
+  return d.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: '2-digit' }) + ' ' + d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
 }
 
 function LocalesModule({ toast }) {
@@ -498,6 +557,7 @@ function LocalesModule({ toast }) {
   const [search,      setSearch]      = useState('')
   const [filterDist,  setFilterDist]  = useState('')
   const [filterStatus,setFilterStatus]= useState('')
+  const [syncingId,   setSyncingId]   = useState(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -532,6 +592,21 @@ function LocalesModule({ toast }) {
       else { await saAPI.blockLocation(loc.id); toast('Local bloqueado — usuarios desconectados en breve') }
       load()
     } catch (e) { toast(e.message, 'err') }
+  }
+
+  const handleSync = async (loc) => {
+    setSyncingId(loc.id)
+    try {
+      const r = await saAPI.syncLocation(loc.id)
+      if (r.ok) {
+        const s = r.summary
+        toast(`Sincronización OK — ${s.employees} empleados, ${s.products} productos, ${s.warehouses} almacenes`)
+      } else {
+        toast(`Error de sincronización: ${r.error}`, 'err')
+      }
+      load()
+    } catch (e) { toast(e.message, 'err') }
+    setSyncingId(null)
   }
 
   const filtered = items.filter(l => {
@@ -587,26 +662,56 @@ function LocalesModule({ toast }) {
             </thead>
             <tbody>
               {filtered.map(loc => {
-                const dist = distributors.find(d => d.id === loc.distributorId)
-                const connColor = loc.connectionStatus === 'active' ? T.green : loc.connectionStatus === 'error' ? T.red : T.muted
-                const connLabel = loc.connectionStatus === 'active' ? 'Conectado' : loc.connectionStatus === 'error' ? 'Error' : 'Sin config.'
+                const dist      = distributors.find(d => d.id === loc.distributorId)
+                const cs        = loc.connectionStatus
+                const connColor = cs === 'active' ? T.green : cs === 'error' ? T.red : T.muted
+                const isSyncing = syncingId === loc.id
                 return (
                   <tr key={loc.id} style={{ background: '#fff' }}>
                     <td style={tdSt}><span style={{ fontWeight: 600 }}>{loc.name}</span></td>
                     <td style={tdSt}><span style={{ color: T.muted }}>{loc.city || '—'}</span></td>
                     <td style={tdSt}><span style={{ color: T.muted }}>{dist?.name || '—'}</span></td>
                     <td style={tdSt}><Badge color={loc.status === 'blocked' ? T.red : T.green} label={loc.status === 'blocked' ? 'Bloqueado' : 'Activo'} /></td>
-                    <td style={tdSt}>
-                      {loc.agoraUrl
-                        ? <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                            {loc.connectionStatus === 'active' ? <Wifi size={13} style={{ color: T.green }} /> : <WifiOff size={13} style={{ color: connColor }} />}
-                            <Badge color={connColor} label={connLabel} />
+                    <td style={{ ...tdSt, minWidth: 180 }}>
+                      {loc.agoraUrl ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                            {cs === 'active'
+                              ? <Wifi size={13} style={{ color: T.green }} />
+                              : <WifiOff size={13} style={{ color: connColor }} />}
+                            <Badge
+                              color={connColor}
+                              label={cs === 'active' ? 'Conectado' : cs === 'error' ? 'Error' : 'Sin sync'}
+                            />
                           </div>
-                        : <span style={{ color: T.muted, fontSize: 12 }}>—</span>
-                      }
+                          {loc.syncSummary && cs === 'active' && (
+                            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                              {[['employees','👤'],['products','📦'],['warehouses','🏭']].map(([k,ico]) => (
+                                loc.syncSummary[k] !== undefined &&
+                                <span key={k} style={{ fontSize: 10, color: T.muted }}>{ico} {loc.syncSummary[k]}</span>
+                              ))}
+                            </div>
+                          )}
+                          {loc.lastSync && (
+                            <span style={{ fontSize: 10, color: T.muted }}>
+                              Última sync: {fmtDate(loc.lastSync)}
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <span style={{ color: T.muted, fontSize: 12 }}>Sin configurar</span>
+                      )}
                     </td>
                     <td style={{ ...tdSt, textAlign: 'right' }}>
-                      <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                      <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                        {loc.agoraUrl && (
+                          <Btn small variant={cs === 'active' ? 'success' : 'secondary'} onClick={() => handleSync(loc)} disabled={isSyncing}>
+                            {isSyncing
+                              ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} />
+                              : <RefreshCw size={12} />}
+                            {isSyncing ? 'Sincronizando…' : 'Sincronizar'}
+                          </Btn>
+                        )}
                         <Btn small variant="secondary" onClick={() => { setEditing(loc); setModal('form') }}><Ic n="edit" s={12} /></Btn>
                         <Btn small variant={loc.status === 'blocked' ? 'success' : 'warn'} onClick={() => handleToggle(loc)}>
                           {loc.status === 'blocked' ? 'Desbloquear' : 'Bloquear'}

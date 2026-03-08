@@ -511,18 +511,94 @@ app.post('/api/sa/distributors/:id/activate', authMiddleware, superadminOnly, (r
 })
 
 // ── LOCATIONS ─────────────────────────────────────────────────────────────────
+// Helper: fetch all Ágora data from a given base URL + token
+const agoraFullSync = async (base, token) => {
+  const H   = { 'Api-Token': token, 'Accept': 'application/json' }
+  const get = async (url) => {
+    const r = await fetch(url, { headers: H, signal: AbortSignal.timeout(15000) })
+    if (!r.ok) throw new Error(`HTTP ${r.status}`)
+    return r.json()
+  }
+  const arr = (obj, ...keys) => { for (const k of keys) if (Array.isArray(obj?.[k])) return obj[k]; return [] }
+
+  const [master, empRes, wpRes] = await Promise.allSettled([
+    get(`${base}/api/export-master/?filter=Products,Stocks,Suppliers,Warehouses`),
+    get(`${base}/api/export-master/?filter=Employees`),
+    get(`${base}/api/export-master/?filter=WorkplacesSummary`),
+  ])
+
+  const masterOk = master.status === 'fulfilled'
+  const empOk    = empRes.status  === 'fulfilled'
+
+  if (!masterOk && !empOk) {
+    const err = master.reason?.message || empRes.reason?.message || 'No se pudo conectar con Ágora'
+    throw new Error(err)
+  }
+
+  const m  = masterOk ? master.value : {}
+  const e  = empOk    ? empRes.value  : {}
+  const wp = wpRes.status === 'fulfilled' ? wpRes.value : {}
+
+  return {
+    employees:  arr(e,  'Employees',  'employees'),
+    warehouses: arr(m,  'Warehouses', 'warehouses'),
+    products:   arr(m,  'Products',   'products'),
+    suppliers:  arr(m,  'Suppliers',  'suppliers'),
+    stocks:     arr(m,  'Stocks',     'stocks'),
+    workplaces: arr(wp, 'WorkplacesSummary', 'workplacesSummary', 'Workplaces', 'workplaces'),
+  }
+}
+
 // Test Ágora connection without saving (must be before /:id routes)
 app.post('/api/sa/locations/test-agora', authMiddleware, superadminOnly, async (req, res) => {
   const { agoraUrl, apiToken } = req.body
   if (!agoraUrl || !apiToken) return res.status(400).json({ ok: false, error: 'URL y Token son obligatorios' })
   try {
-    const url  = `${agoraUrl.replace(/\/$/,'')}/api/export-master/?filter=Employees`
-    const resp = await fetch(url, { headers: { 'Api-Token': apiToken, 'Accept': 'application/json' }, signal: AbortSignal.timeout(8000) })
-    if (!resp.ok) return res.json({ ok: false, error: `Ágora respondió con HTTP ${resp.status}` })
-    const data  = await resp.json()
-    const count = (data?.Employees || data?.employees || []).length
-    res.json({ ok: true, employeesCount: count })
+    const data = await agoraFullSync(agoraUrl.replace(/\/$/,''), apiToken)
+    res.json({
+      ok: true,
+      summary: {
+        employees:  data.employees.length,
+        warehouses: data.warehouses.length,
+        products:   data.products.length,
+        suppliers:  data.suppliers.length,
+        stocks:     data.stocks.length,
+        workplaces: data.workplaces.length,
+      },
+    })
   } catch (e) {
+    res.json({ ok: false, error: e.message || 'No se pudo conectar con Ágora' })
+  }
+})
+
+// Full sync for a saved location — stores results in the location record
+app.post('/api/sa/locations/:id/sync', authMiddleware, superadminOnly, async (req, res) => {
+  const locs = readJSON('locations.json')
+  const idx  = locs.findIndex(l => l.id === req.params.id)
+  if (idx === -1) return res.status(404).json({ error: 'Local no encontrado' })
+  const loc = locs[idx]
+  if (!loc.agoraUrl || !loc.apiToken)
+    return res.status(400).json({ ok: false, error: 'Este local no tiene configurada la conexión con Ágora' })
+  try {
+    const data = await agoraFullSync(loc.agoraUrl.replace(/\/$/,''), loc.apiToken)
+    const summary = {
+      employees:  data.employees.length,
+      warehouses: data.warehouses.length,
+      products:   data.products.length,
+      suppliers:  data.suppliers.length,
+      stocks:     data.stocks.length,
+      workplaces: data.workplaces.length,
+    }
+    locs[idx].connectionStatus = 'active'
+    locs[idx].lastSync         = new Date().toISOString()
+    locs[idx].syncSummary      = summary
+    writeJSON('locations.json', locs)
+    logActivity('superadmin', SUPERADMIN.username, 'SYNC_LOCATION', 'unknown', { locationId: loc.id, name: loc.name, summary })
+    res.json({ ok: true, summary })
+  } catch (e) {
+    locs[idx].connectionStatus = 'error'
+    locs[idx].lastSyncError    = e.message
+    writeJSON('locations.json', locs)
     res.json({ ok: false, error: e.message || 'No se pudo conectar con Ágora' })
   }
 })
@@ -547,18 +623,19 @@ app.post('/api/sa/locations', authMiddleware, superadminOnly, async (req, res) =
   if (!distributorId || !name) return res.status(400).json({ error: 'Distribuidor y nombre son obligatorios' })
   const locs = readJSON('locations.json')
   let connectionStatus = 'unconfigured'
+  let syncSummary = null
   if (agoraUrl && apiToken) {
     try {
-      const url  = `${agoraUrl.replace(/\/$/,'')}/api/export-master/?filter=Employees`
-      const resp = await fetch(url, { headers: { 'Api-Token': apiToken, 'Accept': 'application/json' }, signal: AbortSignal.timeout(8000) })
-      connectionStatus = resp.ok ? 'active' : 'error'
+      const data = await agoraFullSync(agoraUrl.replace(/\/$/,''), apiToken)
+      connectionStatus = 'active'
+      syncSummary = { employees: data.employees.length, warehouses: data.warehouses.length, products: data.products.length, suppliers: data.suppliers.length, stocks: data.stocks.length, workplaces: data.workplaces.length }
     } catch { connectionStatus = 'error' }
   }
   const newLoc = {
     id: `loc_${Date.now()}`, distributorId, name,
     city: city||'', notes: notes||'',
     agoraUrl: agoraUrl||'', apiToken: apiToken||'',
-    status: 'active', connectionStatus,
+    status: 'active', connectionStatus, syncSummary,
     lastSync: connectionStatus === 'active' ? new Date().toISOString() : null,
     createdAt: new Date().toISOString(),
   }
@@ -580,16 +657,16 @@ app.put('/api/sa/locations/:id', authMiddleware, superadminOnly, async (req, res
   if (apiToken         !== undefined) locs[idx].apiToken         = apiToken
   if (connectionStatus !== undefined) locs[idx].connectionStatus = connectionStatus
   if (lastSync         !== undefined) locs[idx].lastSync         = lastSync
-  // Auto-test connection if credentials updated
-  const newUrl   = agoraUrl   !== undefined ? agoraUrl   : locs[idx].agoraUrl
-  const newToken = apiToken   !== undefined ? apiToken   : locs[idx].apiToken
+  // Auto full-sync if credentials changed
+  const newUrl   = agoraUrl !== undefined ? agoraUrl : locs[idx].agoraUrl
+  const newToken = apiToken !== undefined ? apiToken : locs[idx].apiToken
   if ((agoraUrl !== undefined || apiToken !== undefined) && newUrl && newToken) {
     try {
-      const url  = `${newUrl.replace(/\/$/,'')}/api/export-master/?filter=Employees`
-      const resp = await fetch(url, { headers: { 'Api-Token': newToken, 'Accept': 'application/json' }, signal: AbortSignal.timeout(8000) })
-      locs[idx].connectionStatus = resp.ok ? 'active' : 'error'
-      if (resp.ok) locs[idx].lastSync = new Date().toISOString()
-    } catch { locs[idx].connectionStatus = 'error' }
+      const data = await agoraFullSync(newUrl.replace(/\/$/,''), newToken)
+      locs[idx].connectionStatus = 'active'
+      locs[idx].lastSync = new Date().toISOString()
+      locs[idx].syncSummary = { employees: data.employees.length, warehouses: data.warehouses.length, products: data.products.length, suppliers: data.suppliers.length, stocks: data.stocks.length, workplaces: data.workplaces.length }
+    } catch { locs[idx].connectionStatus = 'error'; locs[idx].syncSummary = null }
   }
   writeJSON('locations.json', locs)
   res.json({ ok: true })
