@@ -1,0 +1,11 @@
+# nixpacks.toml — Overrides NIXPACKS auto-detection so Railway only runs
+# the Express server, not the Vite/React frontend build.
+
+[phases.install]
+cmds = ["cd server && npm install"]
+
+[phases.build]
+cmds = []
+
+[start]
+cmd = "cd server && node index.js"
