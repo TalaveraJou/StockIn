@@ -47,7 +47,7 @@ export const PERMS = {
 }
 
 // ── API client ────────────────────────────────────────────────────────────────
-const API_BASE = '/api'
+const API_BASE = `${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api`
 
 const apiFetch = (path, opts = {}) => {
   const token = sessionStorage.getItem('stockin_token')

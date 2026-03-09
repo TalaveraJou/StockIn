@@ -1,6 +1,8 @@
 node_modules/
 dist/
 .env
+.env.local
+server/.env
 *.local
 
 # Runtime data — managed by the server, must NOT be overwritten by git operations

@@ -211,20 +211,19 @@ const superadminOnly = (req, res, next) => {
 // ── Express app ───────────────────────────────────────────────────────────────
 const app = express()
 
-const allowedOrigins = [
-  'http://localhost:5173',
-  'http://localhost:4173',
-  ...(process.env.CORS_ORIGINS ? process.env.CORS_ORIGINS.split(',') : []),
-]
+const origins = (process.env.ALLOWED_ORIGINS || 'http://localhost:5173,http://localhost:4173').split(',').map(o => o.trim())
 app.use(cors({
   origin: (origin, cb) => {
-    // Allow requests with no origin (server-to-server, curl, Vercel functions calling self)
-    if (!origin || allowedOrigins.includes(origin)) return cb(null, true)
-    cb(null, true) // Allow all in demo; restrict in production via CORS_ORIGINS env var
+    // Allow requests with no origin (server-to-server, curl)
+    if (!origin || origins.includes(origin)) return cb(null, true)
+    cb(null, true) // Allow all in demo; restrict in production via ALLOWED_ORIGINS env var
   },
   credentials: true,
 }))
 app.use(bodyParser.json({ limit: '2mb' }))
+
+// ── HEALTH CHECK ──────────────────────────────────────────────────────────────
+app.get('/health', (req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }))
 
 // ── AUTH ──────────────────────────────────────────────────────────────────────
 app.post('/api/auth/login', async (req, res) => {
